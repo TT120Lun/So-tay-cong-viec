@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Sổ Tay Công Việc — OneDrive</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  :root{
+    --ink-900:#0B1F33;
+    --ink-800:#122A42;
+    --ink-700:#1A3854;
+    --grid-line:#2C4A63;
+    --paper:#E8EEF2;
+    --paper-dim:#9FB4C6;
+    --amber:#F2A93C;
+    --amber-dim:#7A5A22;
+    --teal:#4CAF8C;
+    --teal-dim:#2B5E4B;
+    --red:#E2694B;
+    --font-head:'JetBrains Mono','Space Mono',monospace;
+    --font-body:'Inter',-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      var(--ink-900);
+    background-blend-mode: overlay, overlay, normal;
+    color:var(--paper);
+    font-family:var(--font-body);
+    min-height:100vh;
+    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-font-smoothing:antialiased;
+  }
+  .grid-overlay{ opacity:0.35; }
+
+  header{
+    position:sticky; top:0; z-index:20;
+    padding:16px 16px 10px;
+    background:linear-gradient(180deg, rgba(11,31,51,0.97), rgba(11,31,51,0.88) 70%, rgba(11,31,51,0));
+    backdrop-filter: blur(2px);
+  }
+  .brand{
+    font-family:var(--font-head);
+    font-size:11px;
+    letter-spacing:2.5px;
+    color:var(--paper-dim);
+    text-transform:uppercase;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .brand .rev{ color:var(--amber); }
+  h1{
+    font-family:var(--font-head);
+    font-size:22px;
+    margin:6px 0 12px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+  h1 .cursor{ color:var(--amber); }
+
+  .tabs{
+    display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;
+    scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    flex:0 0 auto;
+    font-family:var(--font-head);
+    font-size:11.5px;
+    letter-spacing:0.5px;
+    padding:7px 12px;
+    border:1px solid var(--grid-line);
+    border-radius:3px;
+    color:var(--paper-dim);
+    background:var(--ink-800);
+    white-space:nowrap;
+  }
+  .tab.active{
+    color:var(--ink-900);
+    background:var(--amber);
+    border-color:var(--amber);
+    font-weight:700;
+  }
+  .tab .count{ opacity:0.7; margin-left:3px; }
+
+  .backup-row{
+    margin-top:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .ghostlink{
+    background:none; border:none; padding:0;
+    font-family:var(--font-head);
+    font-size:10.5px;
+    letter-spacing:0.4px;
+    color:var(--paper-dim);
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .backup-row .sep{ color:var(--grid-line); font-size:10px; }
+
+  .cloud-row{
+    margin-top:8px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  }
+  .cloud-status{
+    font-family:var(--font-head); font-size:10px; letter-spacing:0.4px;
+    padding:5px 9px; border-radius:3px;
+    background:var(--ink-700); border:1px solid var(--grid-line); color:var(--paper-dim);
+  }
+  .cloud-status.online{ color:var(--teal); border-color:var(--teal); }
+  .cloud-status.syncing{ color:var(--amber); border-color:var(--amber); }
+  .cloud-btn{
+    font-family:var(--font-head); font-size:10.5px; letter-spacing:0.4px;
+    padding:5px 9px; border-radius:3px;
+    background:var(--ink-700); border:1px solid var(--grid-line); color:var(--paper);
+  }
+  .cloud-btn.primary{ background:var(--amber); border-color:var(--amber); color:var(--ink-900); font-weight:700; }
+
+  .file-chip.has-link{ border-color: var(--teal); }
+  .file-chip .flink{ font-family:var(--font-head); font-size:9.5px; color:var(--teal); flex:0 0 auto; }
+  .file-chip .fpending{ font-family:var(--font-head); font-size:9.5px; color:var(--amber); flex:0 0 auto; }
+
+  .lang-switch{
+    display:inline-flex; border:1px solid var(--grid-line); border-radius:3px; overflow:hidden;
+  }
+  .lang-btn{
+    font-family:var(--font-head); font-size:10px; letter-spacing:0.5px;
+    padding:4px 8px; background:var(--ink-800); color:var(--paper-dim); border:none;
+  }
+  .lang-btn.active{ background:var(--amber); color:var(--ink-900); font-weight:700; }
+
+  .backup-banner{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--ink-800); border:1px solid var(--amber); border-radius:6px;
+    padding:10px 12px; margin-bottom:12px;
+    font-size:12.5px; line-height:1.5; color:var(--paper);
+  }
+  .backup-banner-actions{ display:flex; gap:8px; margin-left:auto; }
+  .backup-banner-actions button{
+    font-family:var(--font-head); font-size:10.5px; letter-spacing:0.4px;
+    padding:6px 10px; border-radius:4px; border:1px solid var(--grid-line);
+    background:var(--ink-700); color:var(--paper);
+  }
+  #backupBannerBackupBtn{ background:var(--amber); border-color:var(--amber); color:var(--ink-900); font-weight:700; }
+
+  main{ padding:14px 16px 140px; }
+
+  .empty{
+    margin-top:60px;
+    text-align:center;
+    color:var(--paper-dim);
+  }
+  .empty .mark{ font-family:var(--font-head); color:var(--amber); font-size:13px; letter-spacing:2px; display:block; margin-bottom:10px;}
+  .empty p{ font-size:14px; line-height:1.6; max-width:280px; margin:0 auto;}
+
+  .card{
+    position:relative;
+    background:var(--ink-800);
+    border:1px solid var(--grid-line);
+    border-left:3px solid var(--grid-line);
+    border-radius:2px;
+    padding:12px 14px 12px 14px;
+    margin-bottom:10px;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .card.priority-cao{ border-left-color: var(--red); }
+  .card.priority-vua{ border-left-color: var(--amber); }
+  .card.priority-thap{ border-left-color: var(--teal); }
+  .card.overdue{
+    border-left-color: var(--red);
+    box-shadow: inset 0 0 0 1px rgba(226,105,75,0.25);
+  }
+  .card.done{ opacity:0.45; }
+  .card.done .title{ text-decoration:line-through; }
+
+  .card-top{ display:flex; gap:10px; align-items:flex-start; }
+  .check{
+    flex:0 0 auto;
+    width:22px; height:22px;
+    border:1.5px solid var(--paper-dim);
+    border-radius:50%;
+    margin-top:1px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px;
+    color:transparent;
+  }
+  .card.done .check{ background:var(--teal); border-color:var(--teal); color:var(--ink-900); }
+
+  .card-body{ flex:1; min-width:0; }
+  .title{ font-size:15.5px; font-weight:600; line-height:1.35; word-break:break-word; white-space:pre-wrap; }
+  .note{ font-size:13px; color:var(--paper-dim); margin-top:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap; }
+
+  .meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+  .chip{
+    font-family:var(--font-head);
+    font-size:10.5px;
+    letter-spacing:0.4px;
+    padding:3px 7px;
+    border-radius:2px;
+    background:var(--ink-700);
+    color:var(--paper-dim);
+    border:1px solid var(--grid-line);
+  }
+  .chip.due{ color:var(--paper); }
+  .chip.due.overdue{ color:var(--red); border-color:var(--red); }
+  .chip.due.today{ color:var(--amber); border-color:var(--amber); }
+  .chip.pr-cao{ color:var(--red); border-color:var(--red); }
+  .chip.pr-vua{ color:var(--amber); border-color:var(--amber); }
+  .chip.pr-thap{ color:var(--teal); border-color:var(--teal); }
+  .chip.cat-dutoan{ color:var(--teal); border-color:var(--teal); }
+  .chip.cat-thietke{ color:#5B8DEF; border-color:#5B8DEF; }
+  .chip.cat-kehoach{ color:#B47EE0; border-color:#B47EE0; }
+  .chip.cat-canhan{ color:var(--paper-dim); border-color:var(--paper-dim); }
+
+  .cat-tabs{
+    display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; margin-top:8px;
+    scrollbar-width:none;
+  }
+  .cat-tabs::-webkit-scrollbar{display:none;}
+  .cat-tab{
+    flex:0 0 auto;
+    font-family:var(--font-head);
+    font-size:10.5px;
+    letter-spacing:0.4px;
+    padding:5px 10px;
+    border:1px solid var(--grid-line);
+    border-radius:3px;
+    color:var(--paper-dim);
+    background:var(--ink-800);
+  }
+  .cat-tab.active{
+    color:var(--ink-900);
+    background:var(--paper-dim);
+    border-color:var(--paper-dim);
+    font-weight:700;
+  }
+  .cat-tab[data-cat="dutoan"].active{ background:var(--teal); border-color:var(--teal); }
+  .cat-tab[data-cat="thietke"].active{ background:#5B8DEF; border-color:#5B8DEF; }
+  .cat-tab[data-cat="kehoach"].active{ background:#B47EE0; border-color:#B47EE0; }
+  .cat-tab[data-cat="canhan"].active{ background:var(--paper-dim); border-color:var(--paper-dim); }
+
+  .del{
+    position:absolute; top:8px; right:8px;
+    width:26px; height:26px;
+    border:none; background:transparent;
+    color:var(--paper-dim);
+    font-size:16px;
+    line-height:1;
+  }
+  .editBtn{
+    position:absolute; top:6px; right:34px;
+    width:26px; height:26px;
+    border:none; background:transparent;
+    color:var(--paper-dim);
+    font-size:14px;
+    line-height:1;
+  }
+  .sendBtn{
+    position:absolute; top:6px; right:60px;
+    width:26px; height:26px;
+    border:none; background:transparent;
+    color:var(--paper-dim);
+    font-size:14px;
+    line-height:1;
+  }
+  .card.selected{
+    border-color: var(--amber);
+    box-shadow: inset 0 0 0 1px rgba(242,169,60,0.35);
+  }
+  .translateBtn{
+    position:absolute; top:6px; right:86px;
+    min-width:26px; height:26px;
+    border:none; background:transparent;
+    color:var(--paper-dim);
+    font-size:13px;
+    line-height:1;
+    padding:0 3px;
+  }
+  .translateBtn.active{ color:var(--teal); }
+  .translateBtn.loading{ color:var(--amber); }
+  .title.translated, .note.translated{ font-style:italic; }
+  .translate-tag{
+    font-family:var(--font-head); font-size:9.5px; letter-spacing:0.4px;
+    color:var(--teal); margin-bottom:3px; display:block;
+  }
+
+  .send-bar{
+    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, var(--ink-900) 70%, rgba(11,31,51,0));
+    display:none;
+  }
+  .send-bar.show{ display:block; }
+  .send-bar-inner{
+    background:var(--ink-800);
+    border:1px solid var(--amber);
+    border-radius:8px;
+    padding:10px 12px;
+  }
+  .send-bar-count{
+    font-family:var(--font-head); font-size:12px; color:var(--amber);
+    letter-spacing:0.5px; margin-bottom:8px;
+  }
+  .send-bar-actions{ display:flex; gap:8px; }
+
+  .composer{
+    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, var(--ink-900) 60%, rgba(11,31,51,0));
+  }
+  .composer-inner{
+    background:var(--ink-800);
+    border:1px solid var(--grid-line);
+    border-radius:8px;
+    padding:8px;
+  }
+  .composer-row1{ display:flex; gap:8px; align-items:flex-end; }
+  #titleInput{
+    flex:1; min-width:0;
+    background:transparent;
+    border:none;
+    color:var(--paper);
+    font-size:15px;
+    font-family:var(--font-body);
+    padding:8px 6px;
+    resize:none;
+    max-height:140px;
+    overflow-y:auto;
+    line-height:1.4;
+  }
+  #titleInput::placeholder{ color:var(--paper-dim); }
+  #titleInput:focus{ outline:none; }
+
+  .addBtn{
+    flex:0 0 auto;
+    width:38px; height:38px;
+    border:none; border-radius:6px;
+    background:var(--amber);
+    color:var(--ink-900);
+    font-size:20px;
+    font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .addBtn:disabled{ background:var(--grid-line); color:var(--paper-dim); }
+
+  .composer-row2{
+    display:flex; gap:6px; margin-top:6px; padding-top:6px;
+    border-top:1px dashed var(--grid-line);
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .composer-row2::-webkit-scrollbar{display:none;}
+  .field{
+    flex:0 0 auto;
+    font-family:var(--font-head);
+    font-size:11px;
+    padding:6px 9px;
+    border-radius:3px;
+    background:var(--ink-700);
+    border:1px solid var(--grid-line);
+    color:var(--paper-dim);
+  }
+  .field.set{ color:var(--amber); border-color:var(--amber); }
+  input[type=datetime-local]{
+    color-scheme: dark;
+    background:transparent; border:none; color:inherit; font-family:inherit; font-size:inherit;
+    width:150px;
+  }
+  select.field{
+    -webkit-appearance:none; appearance:none;
+    width:auto;
+  }
+  #noteInput{
+    flex:1; min-width:140px;
+    background:transparent; border:1px solid var(--grid-line); border-radius:3px;
+    color:var(--paper); font-family:var(--font-body); font-size:12.5px;
+    padding:6px 8px; resize:none; max-height:100px; overflow-y:auto; line-height:1.4;
+  }
+  #noteInput::placeholder{ color:var(--paper-dim); }
+  #noteInput:focus{ outline:none; border-color:var(--paper-dim); }
+
+  .attachBtn{
+    flex:0 0 auto;
+    font-family:var(--font-head);
+    font-size:11px;
+    padding:6px 9px;
+    border-radius:3px;
+    background:var(--ink-700);
+    border:1px solid var(--grid-line);
+    color:var(--paper-dim);
+  }
+  .attachBtn.has-img{ color:var(--amber); border-color:var(--amber); }
+
+  .thumb-strip{
+    display:flex; gap:6px; flex-wrap:wrap;
+    margin-top:8px; padding-top:8px;
+    border-top:1px dashed var(--grid-line);
+  }
+  .thumb-strip:empty{ display:none; border:none; margin:0; padding:0; }
+
+  .file-strip{
+    display:flex; flex-direction:column; gap:6px;
+    margin-top:8px; padding-top:8px;
+    border-top:1px dashed var(--grid-line);
+  }
+  .file-strip:empty{ display:none; border:none; margin:0; padding:0; }
+  .file-chip{
+    display:flex; align-items:center; gap:8px;
+    background:var(--ink-700); border:1px solid var(--grid-line); border-radius:4px;
+    padding:6px 8px;
+  }
+  .file-chip .fic{ font-size:16px; flex:0 0 auto; }
+  .file-chip .fname{ flex:1; min-width:0; font-size:12.5px; color:var(--paper); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .file-chip .fsize{ font-family:var(--font-head); font-size:9.5px; color:var(--paper-dim); flex:0 0 auto; }
+  .file-chip .rm{ background:none; border:none; color:var(--red); font-size:14px; flex:0 0 auto; padding:0 2px; }
+
+  .card-files{ display:flex; flex-direction:column; gap:5px; margin-top:9px; }
+  .card-files .file-chip{ cursor:pointer; }
+  .card-files .rm{ display:none; }
+  .thumb-chip{
+    position:relative;
+    width:52px; height:52px;
+    border-radius:4px; overflow:hidden;
+    border:1px solid var(--grid-line);
+    flex:0 0 auto;
+  }
+  .thumb-chip img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .thumb-chip .rm{
+    position:absolute; top:0; right:0;
+    width:18px; height:18px;
+    background:rgba(11,31,51,0.85);
+    color:var(--red);
+    font-size:13px; line-height:18px; text-align:center;
+    border:none;
+  }
+
+  .card-imgs{
+    display:flex; gap:6px; flex-wrap:wrap;
+    margin-top:9px;
+  }
+  .card-imgs img{
+    width:58px; height:58px; object-fit:cover;
+    border-radius:4px; border:1px solid var(--grid-line);
+  }
+
+  /* Lightbox */
+  .lightbox{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(5,14,24,0.94);
+    display:none;
+    align-items:center; justify-content:center;
+    flex-direction:column;
+    padding:20px;
+  }
+  .lightbox.show{ display:flex; }
+  .lightbox img{ max-width:100%; max-height:78vh; border-radius:4px; object-fit:contain; }
+  .lightbox-bar{
+    display:flex; gap:18px; align-items:center; justify-content:center;
+    margin-top:16px;
+  }
+  .lightbox-bar button{
+    background:var(--ink-800); border:1px solid var(--grid-line); color:var(--paper);
+    font-family:var(--font-head); font-size:13px; padding:8px 14px; border-radius:4px;
+  }
+
+  /* Edit sheet */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:90;
+    background:rgba(5,14,24,0.75);
+    display:none;
+  }
+  .sheet-overlay.show{ display:block; }
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:91;
+    max-height:88vh; overflow-y:auto;
+    background:var(--ink-800);
+    border-top:1px solid var(--grid-line);
+    border-radius:12px 12px 0 0;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+    transform:translateY(100%);
+    transition:transform .22s ease;
+  }
+  .sheet.show{ transform:translateY(0); }
+  .sheet-head{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:12px;
+  }
+  .sheet-head .lbl{ font-family:var(--font-head); font-size:11px; letter-spacing:1.5px; color:var(--paper-dim); }
+  .sheet-close{ background:none; border:none; color:var(--paper-dim); font-size:20px; }
+  .sheet textarea, .sheet input[type=text]{
+    width:100%;
+    background:var(--ink-700); border:1px solid var(--grid-line); border-radius:5px;
+    color:var(--paper); font-family:var(--font-body); font-size:15px;
+    padding:9px 10px; margin-bottom:10px; resize:vertical;
+  }
+  .sheet #editNote{ font-size:13px; min-height:60px; }
+  .sheet-row{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .sheet-actions{ display:flex; gap:8px; margin-top:6px; }
+  .btn{
+    font-family:var(--font-head); font-size:12.5px; letter-spacing:0.4px;
+    padding:10px 14px; border-radius:5px; border:1px solid var(--grid-line);
+    background:var(--ink-700); color:var(--paper); flex:1; text-align:center;
+  }
+  .btn.primary{ background:var(--amber); border-color:var(--amber); color:var(--ink-900); font-weight:700; }
+  .btn.danger{ background:transparent; border-color:var(--red); color:var(--red); flex:0 0 auto; }
+
+  .toast{
+    position:fixed; left:50%; bottom:100px; transform:translateX(-50%) translateY(10px);
+    background:var(--teal); color:var(--ink-900);
+    font-family:var(--font-head); font-size:12px; letter-spacing:0.5px;
+    padding:8px 14px; border-radius:4px;
+    opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+    z-index:40;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span data-i18n="brand">SỔ&nbsp;TAY&nbsp;CÔNG&nbsp;VIỆC</span>
+    <span style="display:flex; align-items:center; gap:8px;">
+      <span class="lang-switch">
+        <button class="lang-btn" id="langViBtn">VI</button>
+        <button class="lang-btn" id="langEnBtn">EN</button>
+      </span>
+      <span class="rev" id="dateNow">—</span>
+    </span>
+  </div>
+  <h1 data-i18n="heading">Việc cần làm<span class="cursor">_</span></h1>
+  <div class="cloud-row">
+    <span class="cloud-status" id="cloudStatus">☁ Chưa kết nối OneDrive</span>
+    <button class="cloud-btn primary" id="cloudSignInBtn">Đăng nhập OneDrive</button>
+    <button class="cloud-btn" id="cloudPushBtn" style="display:none">⬆ Đẩy lên</button>
+    <button class="cloud-btn" id="cloudPullBtn" style="display:none">⬇ Tải về</button>
+    <button class="cloud-btn" id="cloudSignOutBtn" style="display:none">Đăng xuất</button>
+    <button class="cloud-btn" id="cloudSettingsBtn">⚙</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-filter="all"><span data-i18n="tabAll">Tất cả</span><span class="count" id="c-all"></span></button>
+    <button class="tab" data-filter="today"><span data-i18n="tabToday">Hôm nay</span><span class="count" id="c-today"></span></button>
+    <button class="tab" data-filter="overdue"><span data-i18n="tabOverdue">Quá hạn</span><span class="count" id="c-overdue"></span></button>
+    <button class="tab" data-filter="done"><span data-i18n="tabDone">Đã xong</span><span class="count" id="c-done"></span></button>
+  </div>
+  <div class="cat-tabs" id="catTabs">
+    <button class="cat-tab active" data-cat="all" data-i18n="catAll">Tất cả nhóm</button>
+    <button class="cat-tab" data-cat="dutoan" data-i18n="catDutoan">Dự Toán</button>
+    <button class="cat-tab" data-cat="thietke" data-i18n="catThietke">Thiết Kế</button>
+    <button class="cat-tab" data-cat="kehoach" data-i18n="catKehoach">Kế Hoạch</button>
+    <button class="cat-tab" data-cat="canhan" data-i18n="catCanhan">Cá Nhân</button>
+  </div>
+  <div class="backup-row">
+    <button id="exportBtn" class="ghostlink" data-i18n="backupExport">⭳ Sao lưu file</button>
+    <span class="sep">·</span>
+    <button id="importBtn" class="ghostlink" data-i18n="backupImport">⭱ Khôi phục</button>
+    <span class="sep">·</span>
+    <button id="selectModeBtn" class="ghostlink" data-i18n="selectModeOn">🖇 Chọn để gửi</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" />
+  </div>
+</header>
+
+<main id="main">
+  <div class="backup-banner" id="backupBanner" style="display:none">
+    <span id="backupBannerText"></span>
+    <div class="backup-banner-actions">
+      <button id="backupBannerBackupBtn" data-i18n="backupNowBtn">Sao lưu ngay</button>
+      <button id="backupBannerSnoozeBtn" data-i18n="backupSnoozeBtn">Để sau</button>
+    </div>
+  </div>
+  <div class="empty" id="emptyState">
+    <span class="mark" data-i18n="emptyMark">// GHI CHÚ RỖNG</span>
+    <p id="emptyText" data-i18n="emptyBody">Chưa có việc nào. Bất cứ khi nào nhớ ra việc gì, gõ ngay vào ô bên dưới — kể cả chỉ một dòng ngắn.</p>
+  </div>
+  <div id="list"></div>
+</main>
+
+<div class="send-bar" id="sendBar">
+  <div class="send-bar-inner">
+    <div class="send-bar-count" id="sendBarCount">Đã chọn 0 việc</div>
+    <div class="send-bar-actions">
+      <button class="btn" id="sendTextBtn" data-i18n="sendTextBtn">📝 Gửi dạng chữ</button>
+      <button class="btn" id="sendImgBtn" data-i18n="sendImgBtn">🖼 Gửi dạng ảnh</button>
+      <button class="btn danger" id="sendDoneBtn" data-i18n="sendDoneBtn">Xong</button>
+    </div>
+  </div>
+</div>
+
+<div class="composer" id="composerBar">
+  <div class="composer-inner">
+    <div class="composer-row1">
+      <textarea id="titleInput" rows="1" data-i18n-ph="composerPh" placeholder="Nhập việc cần làm... (không giới hạn độ dài)"></textarea>
+      <button class="addBtn" id="addBtn" disabled>+</button>
+    </div>
+    <div class="composer-row2">
+      <label class="field" id="dueField">
+        📅 <input type="datetime-local" id="dueInput" />
+      </label>
+      <select class="field" id="priInput">
+        <option value="vua" data-i18n="priVua">Ưu tiên: Vừa</option>
+        <option value="cao" data-i18n="priCao">Ưu tiên: Cao</option>
+        <option value="thap" data-i18n="priThap">Ưu tiên: Thấp</option>
+      </select>
+      <select class="field" id="catInput">
+        <option value="" data-i18n="catPick">— Nhóm —</option>
+        <option value="dutoan" data-i18n="catDutoan">Dự Toán</option>
+        <option value="thietke" data-i18n="catThietke">Thiết Kế</option>
+        <option value="kehoach" data-i18n="catKehoach">Kế Hoạch</option>
+        <option value="canhan" data-i18n="catCanhan">Cá Nhân</option>
+      </select>
+      <button class="attachBtn" id="attachBtn" type="button" data-i18n="attachImg">📎 Ảnh</button>
+      <button class="attachBtn" id="pasteBtn" type="button" data-i18n="attachPaste">📋 Dán</button>
+      <button class="attachBtn" id="fileAttachBtn" type="button" data-i18n="attachFile">📄 File</button>
+      <input type="file" id="imgInput" accept="image/*" multiple style="display:none" />
+      <input type="file" id="fileInput" multiple style="display:none" />
+    </div>
+    <textarea id="noteInput" rows="1" data-i18n-ph="notePh" placeholder="+ ghi chú (tuỳ chọn)"></textarea>
+    <div class="thumb-strip" id="pendingThumbs"></div>
+    <div class="file-strip" id="pendingFiles"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Xem/sửa việc -->
+<div class="sheet-overlay" id="sheetOverlay"></div>
+<div class="sheet" id="editSheet">
+  <div class="sheet-head">
+    <span class="lbl" data-i18n="editSheetTitle">SỬA VIỆC</span>
+    <button class="sheet-close" id="sheetClose">×</button>
+  </div>
+  <textarea id="editTitle" rows="2" data-i18n-ph="editTitlePh" placeholder="Nội dung công việc"></textarea>
+  <textarea id="editNote" data-i18n-ph="editNotePh" placeholder="Ghi chú"></textarea>
+  <div class="sheet-row">
+    <label class="field" id="editDueField">📅 <input type="datetime-local" id="editDue" /></label>
+    <select class="field" id="editPri">
+      <option value="vua" data-i18n="priVua">Ưu tiên: Vừa</option>
+      <option value="cao" data-i18n="priCao">Ưu tiên: Cao</option>
+      <option value="thap" data-i18n="priThap">Ưu tiên: Thấp</option>
+    </select>
+    <select class="field" id="editCat">
+      <option value="" data-i18n="catPick">— Nhóm —</option>
+      <option value="dutoan" data-i18n="catDutoan">Dự Toán</option>
+      <option value="thietke" data-i18n="catThietke">Thiết Kế</option>
+      <option value="kehoach" data-i18n="catKehoach">Kế Hoạch</option>
+      <option value="canhan" data-i18n="catCanhan">Cá Nhân</option>
+    </select>
+    <button class="attachBtn" id="editAttachBtn" type="button" data-i18n="attachImg">📎 Ảnh</button>
+    <button class="attachBtn" id="editPasteBtn" type="button" data-i18n="attachPaste">📋 Dán</button>
+    <button class="attachBtn" id="editFileAttachBtn" type="button" data-i18n="attachFile">📄 File</button>
+    <input type="file" id="editImgInput" accept="image/*" multiple style="display:none" />
+    <input type="file" id="editFileInput" multiple style="display:none" />
+  </div>
+  <div class="thumb-strip" id="editThumbs"></div>
+  <div class="file-strip" id="editFilesStrip"></div>
+  <div class="sheet-actions">
+    <button class="btn danger" id="editDeleteBtn" data-i18n="deleteTaskBtn">Xoá việc</button>
+    <button class="btn" id="editCancelBtn" data-i18n="cancelBtn">Huỷ</button>
+    <button class="btn primary" id="editSaveBtn" data-i18n="saveBtn">Lưu</button>
+  </div>
+</div>
+
+<!-- Dự phòng khi không mở được bảng Chia sẻ -->
+<div class="sheet-overlay" id="shareFallbackOverlay"></div>
+<div class="sheet" id="shareFallbackSheet">
+  <div class="sheet-head">
+    <span class="lbl" data-i18n="shareFallbackTitle">GỬI THỦ CÔNG</span>
+    <button class="sheet-close" id="shareFallbackClose">×</button>
+  </div>
+  <p id="shareFallbackNote" style="font-size:12.5px; color:var(--amber); line-height:1.6; margin:0 0 10px;"></p>
+  <textarea id="shareFallbackText" rows="8" readonly style="width:100%; background:var(--ink-700); border:1px solid var(--grid-line); border-radius:5px; color:var(--paper); font-family:var(--font-body); font-size:13.5px; padding:9px 10px; margin-bottom:10px;"></textarea>
+  <div class="sheet-actions">
+    <button class="btn primary" id="shareFallbackCopyBtn" data-i18n="copyBtn">📋 Sao chép nội dung</button>
+  </div>
+</div>
+
+<!-- Xem ảnh phóng to -->
+<!-- Cài đặt kết nối OneDrive -->
+<div class="sheet-overlay" id="settingsOverlay"></div>
+<div class="sheet" id="settingsSheet">
+  <div class="sheet-head">
+    <span class="lbl">CÀI ĐẶT ONEDRIVE</span>
+    <button class="sheet-close" id="settingsClose">×</button>
+  </div>
+  <p style="font-size:12.5px; color:var(--paper-dim); line-height:1.6; margin:0 0 10px;">
+    Dán Application (client) ID của app bạn đã đăng ký trên Azure Portal (Entra ID) vào đây.
+  </p>
+  <input type="text" id="clientIdInput" placeholder="Client ID (dạng xxxxxxxx-xxxx-...)" />
+  <div class="sheet-actions">
+    <button class="btn primary" id="clientIdSaveBtn">Lưu Client ID</button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" src="" alt="" />
+  <div class="lightbox-bar">
+    <button id="lbPrev" data-i18n="lbPrev">‹ Trước</button>
+    <button id="lbClose" data-i18n="lbClose">Đóng</button>
+    <button id="lbNext" data-i18n="lbNext">Sau ›</button>
+  </div>
+</div>
+
+<script>
+// ================== NGÔN NGỮ / LANGUAGE ==================
+const I18N = {
+  vi: {
+    brand: 'SỔ&nbsp;TAY&nbsp;CÔNG&nbsp;VIỆC',
+    heading: 'Việc cần làm',
+    tabAll: 'Tất cả', tabToday: 'Hôm nay', tabOverdue: 'Quá hạn', tabDone: 'Đã xong',
+    catAll: 'Tất cả nhóm', catDutoan: 'Dự Toán', catThietke: 'Thiết Kế', catKehoach: 'Kế Hoạch', catCanhan: 'Cá Nhân',
+    catPick: '— Nhóm —',
+    backupExport: '⭳ Sao lưu file', backupImport: '⭱ Khôi phục',
+    selectModeOn: '🖇 Chọn để gửi', selectModeOff: '✕ Thoát chọn',
+    emptyMark: '// GHI CHÚ RỖNG',
+    emptyBody: 'Chưa có việc nào. Bất cứ khi nào nhớ ra việc gì, gõ ngay vào ô bên dưới — kể cả chỉ một dòng ngắn.',
+    emptyBodyFiltered: 'Không có việc nào trong mục này.',
+    composerPh: 'Nhập việc cần làm... (không giới hạn độ dài)',
+    notePh: '+ ghi chú (tuỳ chọn)',
+    priVua: 'Ưu tiên: Vừa', priCao: 'Ưu tiên: Cao', priThap: 'Ưu tiên: Thấp',
+    priVuaShort: 'VỪA', priCaoShort: 'CAO', priThapShort: 'THẤP',
+    attachImg: '📎 Ảnh', attachPaste: '📋 Dán', attachFile: '📄 File',
+    editSheetTitle: 'SỬA VIỆC', editTitlePh: 'Nội dung công việc', editNotePh: 'Ghi chú',
+    deleteTaskBtn: 'Xoá việc', cancelBtn: 'Huỷ', saveBtn: 'Lưu',
+    shareFallbackTitle: 'GỬI THỦ CÔNG', copyBtn: '📋 Sao chép nội dung',
+    sendTextBtn: '📝 Gửi dạng chữ', sendImgBtn: '🖼 Gửi dạng ảnh', sendDoneBtn: 'Xong',
+    sendBarCount: n=> `Đã chọn ${n} việc`,
+    lbPrev: '‹ Trước', lbClose: 'Đóng', lbNext: 'Sau ›',
+    weekdays: ['CN','T2','T3','T4','T5','T6','T7'],
+    reportHeader: (d)=> `📌 BÁO CÁO CÔNG VIỆC — ${d}`,
+    reportFooter: '— Gửi từ Sổ Tay Công Việc',
+    dueLabel: 'Hạn', priorityWord: 'Ưu tiên',
+    toastAdded: 'Đã thêm việc', toastSaved: 'Đã lưu thay đổi', toastDeleted: 'Đã xoá',
+    toastBackupSaved: 'Đã mở bảng chia sẻ', toastBackupDownloaded: 'Đã tải file sao lưu',
+    toastRestored: 'Đã khôi phục dữ liệu', toastInvalidBackup: 'File sao lưu không hợp lệ',
+    toastEmptyTitle: 'Nội dung không được để trống', toastNoSelection: 'Chưa chọn việc nào',
+    toastCopied: 'Đã copy — dán vào Zalo để gửi', toastManualCopy: 'Hãy tự bôi đen và copy trong ô phía trên',
+    translatedToEn: 'Bản dịch tiếng Anh', translatedToVi: 'Bản dịch tiếng Việt',
+    toastTranslateFail: 'Không dịch được lúc này — kiểm tra kết nối mạng',
+    backupReminderNever: '💡 Bạn chưa từng sao lưu dữ liệu ra khỏi máy. Nên sao lưu ngay để phòng mất dữ liệu.',
+    backupReminder: n=> `💡 Đã ${n} ngày chưa sao lưu dữ liệu. Bấm sao lưu để an toàn hơn.`,
+    backupNowBtn: 'Sao lưu ngay', backupSnoozeBtn: 'Để sau',
+  },
+  en: {
+    brand: 'TASK&nbsp;NOTEBOOK',
+    heading: 'Things to do',
+    tabAll: 'All', tabToday: 'Today', tabOverdue: 'Overdue', tabDone: 'Done',
+    catAll: 'All groups', catDutoan: 'Estimate', catThietke: 'Design', catKehoach: 'Planning', catCanhan: 'Personal',
+    catPick: '— Group —',
+    backupExport: '⭳ Backup file', backupImport: '⭱ Restore',
+    selectModeOn: '🖇 Select to send', selectModeOff: '✕ Exit select',
+    emptyMark: '// EMPTY LOG',
+    emptyBody: 'No tasks yet. Whenever you think of something, type it below — even just one short line.',
+    emptyBodyFiltered: 'No tasks in this view.',
+    composerPh: 'Type a task... (no length limit)',
+    notePh: '+ note (optional)',
+    priVua: 'Priority: Medium', priCao: 'Priority: High', priThap: 'Priority: Low',
+    priVuaShort: 'MED', priCaoShort: 'HIGH', priThapShort: 'LOW',
+    attachImg: '📎 Photo', attachPaste: '📋 Paste', attachFile: '📄 File',
+    editSheetTitle: 'EDIT TASK', editTitlePh: 'Task content', editNotePh: 'Note',
+    deleteTaskBtn: 'Delete', cancelBtn: 'Cancel', saveBtn: 'Save',
+    shareFallbackTitle: 'MANUAL SEND', copyBtn: '📋 Copy content',
+    sendTextBtn: '📝 Send as text', sendImgBtn: '🖼 Send as image', sendDoneBtn: 'Done',
+    sendBarCount: n=> `${n} selected`,
+    lbPrev: '‹ Prev', lbClose: 'Close', lbNext: 'Next ›',
+    weekdays: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    reportHeader: (d)=> `📌 WORK REPORT — ${d}`,
+    reportFooter: '— Sent from Task Notebook',
+    dueLabel: 'Due', priorityWord: 'Priority',
+    toastAdded: 'Task added', toastSaved: 'Changes saved', toastDeleted: 'Deleted',
+    toastBackupSaved: 'Share sheet opened', toastBackupDownloaded: 'Backup file downloaded',
+    toastRestored: 'Data restored', toastInvalidBackup: 'Invalid backup file',
+    toastEmptyTitle: 'Content cannot be empty', toastNoSelection: 'No tasks selected',
+    toastCopied: 'Copied — paste it into Zalo to send', toastManualCopy: 'Please select and copy the text above manually',
+    translatedToEn: 'English translation', translatedToVi: 'Vietnamese translation',
+    toastTranslateFail: 'Could not translate right now — check your connection',
+    backupReminderNever: '💡 You have never backed up your data outside this device. Back up now to avoid losing it.',
+    backupReminder: n=> `💡 It's been ${n} days since your last backup. Back up now to stay safe.`,
+    backupNowBtn: 'Backup now', backupSnoozeBtn: 'Later',
+  }
+};
+let currentLang = localStorage.getItem('sotaycv_lang') || 'vi';
+function T(key){
+  const v = (I18N[currentLang] && I18N[currentLang][key]);
+  return v !== undefined ? v : (I18N.vi[key] !== undefined ? I18N.vi[key] : key);
+}
+function applyStaticI18n(){
+  document.documentElement.lang = currentLang;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    el.innerHTML = T(key);
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    el.setAttribute('placeholder', T(el.getAttribute('data-i18n-ph')));
+  });
+  $('langViBtn').classList.toggle('active', currentLang==='vi');
+  $('langEnBtn').classList.toggle('active', currentLang==='en');
+  $('selectModeBtn').textContent = selectMode ? T('selectModeOff') : T('selectModeOn');
+  updateSendBar();
+}
+function setLanguage(lang){
+  currentLang = lang;
+  localStorage.setItem('sotaycv_lang', lang);
+  applyStaticI18n();
+  fmtDateHeader();
+  render();
+  checkBackupReminder();
+}
+
+let tasks = [];
+let currentFilter = 'all';
+
+const $ = (id) => document.getElementById(id);
+const list = $('list');
+const emptyState = $('emptyState');
+const titleInput = $('titleInput');
+const dueInput = $('dueInput');
+const priInput = $('priInput');
+const noteInput = $('noteInput');
+const addBtn = $('addBtn');
+const dueField = $('dueField');
+const toastEl = $('toast');
+const imgInput = $('imgInput');
+const attachBtn = $('attachBtn');
+const pasteBtn = $('pasteBtn');
+const pendingThumbs = $('pendingThumbs');
+const fileInput = $('fileInput');
+const fileAttachBtn = $('fileAttachBtn');
+const pendingFilesEl = $('pendingFiles');
+
+let pendingImages = [];
+let pendingFiles = [];
+let editImages = [];
+let editFiles = [];
+let editingId = null;
+let lightboxImages = [];
+let lightboxIndex = 0;
+let selectMode = false;
+let selectedIds = new Set();
+let currentCategory = 'all';
+
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>toastEl.classList.remove('show'), 1600);
+}
+
+function fmtDateHeader(){
+  const d = new Date();
+  const days = T('weekdays');
+  $('dateNow').textContent = `${days[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function isSameDay(a,b){
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+
+function dueStatus(task){
+  if(!task.due) return null;
+  const now = new Date();
+  const due = new Date(task.due);
+  if(!task.done && due < now && !isSameDay(due, now)) return 'overdue';
+  if(isSameDay(due, now)) return 'today';
+  return 'future';
+}
+
+function fmtDue(iso){
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${dd}/${mm} ${hh}:${mi}`;
+}
+
+// ===== Lưu trữ: IndexedDB (dung lượng lớn hơn nhiều so với localStorage,
+// cần thiết vì ảnh đính kèm chiếm nhiều dung lượng) =====
+const DB_NAME = 'sotaycongviec_onedrive_db';
+const STORE_NAME = 'kv';
+const OLD_STORAGE_KEY = 'sotaycongviec_tasks_v1'; // key localStorage cũ, dùng để di chuyển dữ liệu 1 lần
+
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(STORE_NAME); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(key);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(value, key);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+async function loadTasks(){
+  try{
+    const stored = await idbGet('tasks');
+    if(stored){
+      tasks = stored;
+    } else {
+      // Chưa có dữ liệu trong IndexedDB -> thử di chuyển từ localStorage cũ (nếu có)
+      const raw = localStorage.getItem(OLD_STORAGE_KEY);
+      tasks = raw ? JSON.parse(raw) : [];
+      if(tasks.length) await idbSet('tasks', tasks);
+    }
+  }catch(e){
+    tasks = [];
+    showToast('Không đọc được dữ liệu cũ');
+  }
+  render();
+}
+
+async function saveTasks(){
+  try{
+    await idbSet('tasks', tasks);
+    scheduleAutoSync();
+  }catch(e){
+    showToast('⚠ Lưu thất bại — hãy Sao lưu file ngay');
+  }
+}
+
+async function exportBackup(){
+  const stamp = new Date().toISOString().slice(0,10);
+  const filename = `sotaycongviec_saoluu_${stamp}.json`;
+  const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'});
+
+  // Ưu tiên mở bảng Chia sẻ của điện thoại (Zalo, Gmail, Drive...) nếu hỗ trợ
+  try{
+    const file = new File([blob], filename, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({
+        files:[file],
+        title:'Sao lưu Sổ Tay Công Việc',
+        text:`Sao lưu ${tasks.length} việc — ngày ${stamp}`
+      });
+      showToast(T('toastBackupSaved'));
+      recordBackupDone();
+      return;
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return; // người dùng tự huỷ chia sẻ, không cần báo lỗi
+  }
+
+  // Máy tính / trình duyệt không hỗ trợ Chia sẻ -> tải file như bình thường
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast(T('toastBackupDownloaded'));
+  recordBackupDone();
+}
+
+function importBackup(file){
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!Array.isArray(data)) throw new Error('bad format');
+      const merge = confirm(`File có ${data.length} việc. Bấm OK để GHÉP vào danh sách hiện tại, Cancel để THAY THẾ toàn bộ.`);
+      if(merge){
+        const existingIds = new Set(tasks.map(t=>t.id));
+        data.forEach(t=>{ if(!existingIds.has(t.id)) tasks.push(t); });
+      } else {
+        tasks = data;
+      }
+      await saveTasks();
+      render();
+      showToast(T('toastRestored'));
+      recordBackupDone();
+    }catch(e){
+      showToast(T('toastInvalidBackup'));
+    }
+  };
+  reader.readAsText(file);
+}
+
+function genId(){
+  return 'tk_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+}
+
+// ===== Ảnh: nén trước khi lưu để tiết kiệm dung lượng trình duyệt =====
+function compressImage(file, maxDim=1400, quality=0.82){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = ()=>{ img.src = reader.result; };
+    reader.onerror = reject;
+    img.onload = ()=>{
+      let {width, height} = img;
+      if(width > maxDim || height > maxDim){
+        if(width > height){ height = Math.round(height * maxDim/width); width = maxDim; }
+        else{ width = Math.round(width * maxDim/height); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addImagesToPending(files, targetArr, renderFn){
+  for(const file of Array.from(files)){
+    if(!file.type || !file.type.startsWith('image/')) continue;
+    try{
+      const dataUrl = await compressImage(file);
+      targetArr.push({id: genId(), dataUrl});
+    }catch(e){ showToast('Không đọc được ảnh này'); }
+  }
+  renderFn();
+}
+
+function renderThumbStrip(container, arr, onRemove){
+  container.innerHTML = arr.map(im=>`
+    <div class="thumb-chip">
+      <img src="${im.dataUrl}" data-view="${im.id}" />
+      <button class="rm" data-rm="${im.id}">×</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('[data-rm]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      onRemove(btn.getAttribute('data-rm'));
+    });
+  });
+}
+
+function renderPendingThumbs(){
+  renderThumbStrip(pendingThumbs, pendingImages, (id)=>{
+    pendingImages = pendingImages.filter(im=>im.id!==id);
+    renderPendingThumbs();
+  });
+  attachBtn.classList.toggle('has-img', pendingImages.length>0);
+}
+
+// ===== File đính kèm (không phải ảnh): PDF, Word, Excel, bản vẽ... =====
+function fileIcon(name){
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if(ext==='pdf') return '📕';
+  if(['doc','docx'].includes(ext)) return '📘';
+  if(['xls','xlsx','xlsm','csv'].includes(ext)) return '📗';
+  if(['ppt','pptx'].includes(ext)) return '📙';
+  if(['zip','rar','7z'].includes(ext)) return '🗜️';
+  if(['dwg','dxf'].includes(ext)) return '📐';
+  if(['mp3','wav','m4a'].includes(ext)) return '🎙️';
+  if(['mp4','mov','avi'].includes(ext)) return '🎞️';
+  return '📄';
+}
+function fmtFileSize(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+function readFileAsDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function addFilesToPending(fileList, targetArr, renderFn){
+  for(const file of Array.from(fileList)){
+    if(file.size > 20*1024*1024){ showToast(`"${file.name}" quá lớn (>20MB) — bỏ qua`); continue; }
+    const entry = { id: genId(), name: file.name, size: file.size, type: file.type, dataUrl: null, link: null, pendingUpload: true };
+    try{
+      entry.dataUrl = await readFileAsDataUrl(file);
+    }catch(e){ showToast(`Không đọc được file "${file.name}"`); continue; }
+    targetArr.push(entry);
+    // Đã kết nối OneDrive -> tự động tải file lên nền và gán link sao lưu ngay
+    if(odAccount) uploadFileAndAttachLink(entry, renderFn);
+    else entry.pendingUpload = false;
+  }
+  renderFn();
+}
+async function uploadFileAndAttachLink(entry, renderFn){
+  try{
+    const link = await odUploadAndGetLink(entry.dataUrl, entry.name, entry.type);
+    entry.link = link;
+    entry.pendingUpload = false;
+    entry.dataUrl = null; // đã có link sao lưu, giải phóng bộ nhớ cục bộ
+    renderFn();
+    await saveTasks();
+    showToast(`Đã sao lưu "${entry.name}" lên OneDrive`);
+  }catch(e){
+    entry.pendingUpload = false;
+    renderFn();
+  }
+}
+function renderFileStrip(container, arr, onRemove){
+  container.innerHTML = arr.map(f=>`
+    <div class="file-chip ${f.link ? 'has-link' : ''}">
+      <span class="fic">${fileIcon(f.name)}</span>
+      <span class="fname">${escapeHtml(f.name)}</span>
+      <span class="fsize">${fmtFileSize(f.size)}</span>
+      ${f.link ? '<span class="flink">🔗 đã sao lưu</span>' : (f.pendingUpload ? '<span class="fpending">⏳ đang tải lên</span>' : '')}
+      <button class="rm" data-frm="${f.id}">×</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('[data-frm]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      onRemove(btn.getAttribute('data-frm'));
+    });
+  });
+}
+function renderPendingFiles(){
+  renderFileStrip(pendingFilesEl, pendingFiles, (id)=>{
+    pendingFiles = pendingFiles.filter(f=>f.id!==id);
+    renderPendingFiles();
+  });
+  fileAttachBtn.classList.toggle('has-img', pendingFiles.length>0);
+}
+async function openAttachedFile(dataUrl, name, mime){
+
+  // Thử chia sẻ trực tiếp file này (không kèm chữ) — dễ được app nhận hơn là gửi chung với văn bản
+  try{
+    const blob = await dataUrlToBlob(dataUrl);
+    const file = new File([blob], name, {type: mime || blob.type || 'application/octet-stream'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ files:[file] });
+      return;
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return; // bạn tự đóng bảng chia sẻ
+    /* rơi xuống tải file về máy */
+  }
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = name;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  showToast('Đã tải file — mở Zalo và đính kèm file này thủ công');
+}
+
+async function pasteFromClipboard(targetArr, renderFn){
+  try{
+    const items = await navigator.clipboard.read();
+    let found = false;
+    for(const item of items){
+      for(const type of item.types){
+        if(type.startsWith('image/')){
+          const blob = await item.getType(type);
+          const dataUrl = await compressImage(blob);
+          targetArr.push({id: genId(), dataUrl});
+          found = true;
+        }
+      }
+    }
+    if(found){ renderFn(); showToast('Đã dán ảnh'); }
+    else showToast('Clipboard không có ảnh — hãy copy ảnh trước');
+  }catch(e){
+    showToast('Không dán được — thử nhấn giữ ô nhập rồi chọn Dán');
+  }
+}
+
+function renderEditThumbs(){
+  renderThumbStrip($('editThumbs'), editImages, (id)=>{
+    editImages = editImages.filter(im=>im.id!==id);
+    renderEditThumbs();
+  });
+  $('editAttachBtn').classList.toggle('has-img', editImages.length>0);
+}
+function renderEditFiles(){
+  renderFileStrip($('editFilesStrip'), editFiles, (id)=>{
+    editFiles = editFiles.filter(f=>f.id!==id);
+    renderEditFiles();
+  });
+  $('editFileAttachBtn').classList.toggle('has-img', editFiles.length>0);
+}
+
+// Bắt sự kiện Ctrl+V / dán tay khi con trỏ đang ở trong app
+document.addEventListener('paste', async (e)=>{
+  const items = e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  const imgFiles = [];
+  for(const item of items){
+    if(item.type && item.type.startsWith('image/')) imgFiles.push(item.getAsFile());
+  }
+  if(!imgFiles.length) return;
+  const inEditSheet = $('editSheet').classList.contains('show');
+  if(inEditSheet){
+    await addImagesToPending(imgFiles, editImages, renderEditThumbs);
+  } else {
+    await addImagesToPending(imgFiles, pendingImages, renderPendingThumbs);
+  }
+});
+
+function autoResize(el){
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+titleInput.addEventListener('input', ()=>{
+  addBtn.disabled = !titleInput.value.trim();
+  autoResize(titleInput);
+});
+noteInput.addEventListener('input', ()=> autoResize(noteInput));
+
+attachBtn.addEventListener('click', ()=> imgInput.click());
+imgInput.addEventListener('change', async (e)=>{
+  await addImagesToPending(e.target.files, pendingImages, renderPendingThumbs);
+  e.target.value = '';
+});
+pasteBtn.addEventListener('click', ()=> pasteFromClipboard(pendingImages, renderPendingThumbs));
+fileAttachBtn.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', async (e)=>{
+  await addFilesToPending(e.target.files, pendingFiles, renderPendingFiles);
+  e.target.value = '';
+});
+
+async function addTask(){
+  const title = titleInput.value.trim();
+  if(!title) return;
+  const task = {
+    id: genId(),
+    title,
+    note: noteInput.value.trim(),
+    due: dueInput.value ? new Date(dueInput.value).toISOString() : null,
+    priority: priInput.value,
+    category: $('catInput').value,
+    images: pendingImages.slice(),
+    files: pendingFiles.slice(),
+    done: false,
+    createdAt: new Date().toISOString()
+  };
+  tasks.unshift(task);
+  titleInput.value = '';
+  noteInput.value = '';
+  dueInput.value = '';
+  priInput.value = 'vua';
+  $('catInput').value = '';
+  pendingImages = [];
+  pendingFiles = [];
+  renderPendingThumbs();
+  renderPendingFiles();
+  dueField.classList.remove('set');
+  addBtn.disabled = true;
+  autoResize(titleInput);
+  autoResize(noteInput);
+  render();
+  await saveTasks();
+  showToast(T('toastAdded'));
+}
+
+async function toggleDone(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  t.done = !t.done;
+  render();
+  await saveTasks();
+}
+
+async function deleteTask(id){
+  tasks = tasks.filter(x=>x.id!==id);
+  render();
+  await saveTasks();
+  showToast(T('toastDeleted'));
+}
+
+function priorityLabel(p){
+  return p==='cao' ? T('priCaoShort') : p==='thap' ? T('priThapShort') : T('priVuaShort');
+}
+function categoryLabel(c){
+  return {dutoan:T('catDutoan'), thietke:T('catThietke'), kehoach:T('catKehoach'), canhan:T('catCanhan')}[c] || '';
+}
+
+// ===== Chọn nhiều việc để gửi =====
+function toggleSelectMode(){
+  selectMode = !selectMode;
+  selectedIds.clear();
+  $('selectModeBtn').textContent = selectMode ? T('selectModeOff') : T('selectModeOn');
+  $('composerBar').style.display = selectMode ? 'none' : '';
+  updateSendBar();
+  render();
+}
+function toggleSelect(id){
+  if(selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateSendBar();
+  render();
+}
+function updateSendBar(){
+  $('sendBar').classList.toggle('show', selectMode);
+  $('sendBarCount').textContent = T('sendBarCount')(selectedIds.size);
+}
+
+function selectedTasksOrdered(){
+  return tasks.filter(t=>selectedIds.has(t.id));
+}
+
+// ===== Tạo nội dung báo cáo dạng chữ =====
+function buildReportText(list){
+  const now = new Date();
+  const days = T('weekdays');
+  const dateStr = `${days[now.getDay()]} ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+  const header = T('reportHeader')(dateStr);
+  const lines = list.map((t,i)=>{
+    let block = `${i+1}. ${t.title}`;
+    const metaParts = [];
+    if(t.due) metaParts.push(`📅 ${T('dueLabel')}: ${fmtDue(t.due)}`);
+    metaParts.push(`${T('priorityWord')}: ${priorityLabel(t.priority)}`);
+    block += `\n   ${metaParts.join(' | ')}`;
+    if(t.note) block += `\n   📝 ${t.note}`;
+    if(t.files && t.files.length){
+      t.files.forEach(f=>{
+        if(f.link) block += `\n   📎 ${f.name}: ${f.link}`;
+      });
+    }
+    return block;
+  });
+  return `${header}\n\n${lines.join('\n\n')}\n\n${T('reportFooter')}`;
+}
+
+async function shareText(text){
+  try{
+    if(navigator.share){
+      await navigator.share({ text });
+      return;
+    }
+    throw new Error('no share api');
+  }catch(e){
+    if(e && e.name === 'AbortError') return;
+    try{
+      await navigator.clipboard.writeText(text);
+      showToast('Đã copy nội dung — dán vào Zalo để gửi');
+    }catch(e2){
+      showToast('Không chia sẻ được trên máy này');
+    }
+  }
+}
+
+// Giải mã nhanh bằng cơ chế native của trình duyệt (nhanh hơn nhiều lần so với
+// tự lặp từng byte) — quan trọng vì Android chỉ cho mở bảng Chia sẻ trong ít giây
+// ngay sau cú chạm của người dùng; xử lý chậm sẽ làm mất quyền mở bảng đó.
+async function dataUrlToBlob(dataUrl){
+  const res = await fetch(dataUrl);
+  return await res.blob();
+}
+
+// Gửi kèm ẢNH GỐC đã đính kèm vào từng việc (không phải chỉ chữ tóm tắt).
+// LƯU Ý: file tài liệu (PDF/Word/Excel...) KHÔNG đưa vào lượt gửi chung này —
+// nhiều app (Zalo...) từ chối cả lượt chia sẻ nếu vừa có file tài liệu vừa có
+// chữ kèm theo, khiến cả ảnh cũng gửi không được theo. File tài liệu gửi riêng
+// qua nút mở file trên từng thẻ việc (openAttachedFile).
+async function shareTasksWithImages(list, includeSummaryCard){
+  const text = buildReportText(list);
+  const buildJobs = [];
+  let docFileCount = 0;
+
+  // Chuẩn bị ẢNH song song (không chờ lần lượt) để giảm tối đa thời gian
+  // từ lúc bấm nút đến lúc gọi bảng Chia sẻ
+  if(includeSummaryCard){
+    buildJobs.push(
+      buildReportImage(list)
+        .then(blob=> new File([blob], 'baocao_congviec.png', {type:'image/png'}))
+        .catch(()=> null)
+    );
+  }
+  list.forEach(t=>{
+    (t.images||[]).forEach((im, i)=>{
+      const safeName = t.title.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,24) || 'viec';
+      buildJobs.push(
+        dataUrlToBlob(im.dataUrl)
+          .then(blob=> new File([blob], `${safeName}_${i+1}.jpg`, {type:'image/jpeg'}))
+          .catch(()=> null)
+      );
+    });
+    docFileCount += (t.files||[]).filter(f=> !f.link).length;
+  });
+
+  const built = await Promise.all(buildJobs);
+  const files = built.filter(Boolean); // chỉ gồm ảnh (và thẻ tóm tắt, cũng là ảnh)
+
+  const attachNote = docFileCount
+    ? `Có ${docFileCount} file tài liệu đính kèm — Zalo không nhận gửi chung với chữ được, hãy mở mục "📄 file" trong từng việc để gửi riêng.`
+    : '';
+
+  // QUAN TRỌNG: Android chỉ cho gọi bảng Chia sẻ ĐÚNG 1 LẦN cho mỗi cú chạm của
+  // người dùng — gọi lại lần 2 sau khi lần 1 thất bại sẽ luôn bị chặn âm thầm.
+  try{
+    if(files.length && navigator.canShare && navigator.canShare({files})){
+      await navigator.share({ files, text, title:'Báo cáo công việc' });
+      if(attachNote) showToast(attachNote);
+      return;
+    }
+    if(navigator.share){
+      await navigator.share({ text });
+      if(attachNote) showToast(attachNote);
+      return;
+    }
+    throw new Error('Trình duyệt không hỗ trợ Chia sẻ');
+  }catch(e){
+    if(e && e.name === 'AbortError') return; // bạn tự đóng bảng chia sẻ, không phải lỗi
+    openShareFallback(text, attachNote || (files.length
+      ? 'Máy này không gửi kèm ảnh qua bảng Chia sẻ được — hãy mở từng ảnh trong việc để lưu/gửi thủ công.'
+      : ''));
+  }
+}
+
+// ===== Khung dự phòng: sao chép thủ công khi bảng Chia sẻ không mở được =====
+function openShareFallback(text, note){
+  $('shareFallbackText').value = text;
+  $('shareFallbackNote').textContent = note;
+  $('shareFallbackNote').style.display = note ? '' : 'none';
+  $('shareFallbackOverlay').classList.add('show');
+  $('shareFallbackSheet').classList.add('show');
+}
+function closeShareFallback(){
+  $('shareFallbackOverlay').classList.remove('show');
+  $('shareFallbackSheet').classList.remove('show');
+}
+$('shareFallbackClose').addEventListener('click', closeShareFallback);
+$('shareFallbackOverlay').addEventListener('click', closeShareFallback);
+$('shareFallbackCopyBtn').addEventListener('click', async ()=>{
+  const ta = $('shareFallbackText');
+  ta.focus();
+  ta.select();
+  try{
+    await navigator.clipboard.writeText(ta.value);
+    showToast(T('toastCopied'));
+  }catch(e){
+    try{
+      const ok = document.execCommand('copy');
+      showToast(ok ? T('toastCopied') : T('toastManualCopy'));
+    }catch(e2){
+      showToast(T('toastManualCopy'));
+    }
+  }
+});
+
+// ===== Tạo báo cáo dạng ảnh (thẻ) =====
+function wrapCanvasText(ctx, text, maxWidth){
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  words.forEach(w=>{
+    const test = line ? line + ' ' + w : w;
+    if(ctx.measureText(test).width > maxWidth && line){
+      lines.push(line);
+      line = w;
+    } else {
+      line = test;
+    }
+  });
+  if(line) lines.push(line);
+  return lines;
+}
+
+function buildReportImage(list){
+  return new Promise(resolve=>{
+    const W = 720;
+    const PAD = 32;
+    const contentW = W - PAD*2;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // đo trước chiều cao cần thiết
+    ctx.font = '600 20px Arial';
+    let estH = 150;
+    const itemLines = list.map(t=>{
+      ctx.font = '700 19px Arial';
+      const titleLines = wrapCanvasText(ctx, t.title, contentW - 20);
+      ctx.font = '400 15px Arial';
+      const noteLines = t.note ? wrapCanvasText(ctx, t.note, contentW - 20) : [];
+      const h = 34 + titleLines.length*24 + (noteLines.length? noteLines.length*20 + 6 : 0) + 30;
+      estH += h;
+      return {t, titleLines, noteLines, h};
+    });
+    estH += 50;
+    canvas.width = W;
+    canvas.height = estH;
+
+    // nền
+    ctx.fillStyle = '#0B1F33';
+    ctx.fillRect(0,0,W,estH);
+    ctx.strokeStyle = 'rgba(44,74,99,0.5)';
+    ctx.lineWidth = 1;
+    for(let x=0; x<W; x+=28){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,estH); ctx.stroke(); }
+    for(let y=0; y<estH; y+=28){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // header
+    const now = new Date();
+    const days = ['CN','T2','T3','T4','T5','T6','T7'];
+    const dateStr = `${days[now.getDay()]} ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+    ctx.fillStyle = '#9FB4C6';
+    ctx.font = '11px monospace';
+    ctx.fillText('SỔ TAY CÔNG VIỆC', PAD, 34);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#F2A93C';
+    ctx.fillText(dateStr, W-PAD, 34);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#E8EEF2';
+    ctx.font = '700 26px Arial';
+    ctx.fillText('Báo cáo công việc', PAD, 70);
+    ctx.strokeStyle = '#2C4A63';
+    ctx.beginPath(); ctx.moveTo(PAD, 88); ctx.lineTo(W-PAD, 88); ctx.stroke();
+
+    let y = 118;
+    itemLines.forEach((item, idx)=>{
+      const {t, titleLines, noteLines} = item;
+      const priColor = t.priority==='cao' ? '#E2694B' : t.priority==='thap' ? '#4CAF8C' : '#F2A93C';
+      // vạch ưu tiên bên trái
+      ctx.fillStyle = priColor;
+      ctx.fillRect(PAD-14, y-16, 3, item.h - 14);
+
+      ctx.fillStyle = '#E8EEF2';
+      ctx.font = '700 19px Arial';
+      ctx.fillText(`${idx+1}. ${titleLines[0]||''}`, PAD, y);
+      for(let i=1;i<titleLines.length;i++){
+        y += 24;
+        ctx.fillText(titleLines[i], PAD+18, y);
+      }
+      y += 24;
+
+      const metaParts = [];
+      if(t.due) metaParts.push(`📅 ${fmtDue(t.due)}`);
+      metaParts.push(priorityLabel(t.priority));
+      ctx.font = '11px monospace';
+      ctx.fillStyle = priColor;
+      ctx.fillText(metaParts.join('   •   '), PAD+18, y);
+      y += 6;
+
+      if(noteLines.length){
+        ctx.font = '400 15px Arial';
+        ctx.fillStyle = '#9FB4C6';
+        noteLines.forEach(nl=>{
+          y += 20;
+          ctx.fillText(nl, PAD+18, y);
+        });
+      }
+      y += 30;
+    });
+
+    ctx.strokeStyle = '#2C4A63';
+    ctx.beginPath(); ctx.moveTo(PAD, y-10); ctx.lineTo(W-PAD, y-10); ctx.stroke();
+    ctx.fillStyle = '#9FB4C6';
+    ctx.font = '11px monospace';
+    ctx.fillText('— Gửi từ Sổ Tay Công Việc', PAD, y+14);
+
+    canvas.toBlob(blob=> resolve(blob), 'image/png');
+  });
+}
+
+async function shareImage(blob, filename){
+  try{
+    const file = new File([blob], filename, {type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ files:[file], title:'Báo cáo công việc' });
+      return;
+    }
+    throw new Error('no share files');
+  }catch(e){
+    if(e && e.name === 'AbortError') return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Đã tải ảnh báo cáo — mở Zalo và gửi ảnh này');
+  }
+}
+
+function filteredTasks(){
+  const now = new Date();
+  let base = tasks;
+  if(currentCategory !== 'all') base = base.filter(t=> t.category === currentCategory);
+  if(currentFilter==='today') return base.filter(t=>!t.done && t.due && isSameDay(new Date(t.due), now));
+  if(currentFilter==='overdue') return base.filter(t=>!t.done && t.due && new Date(t.due) < now && !isSameDay(new Date(t.due), now));
+  if(currentFilter==='done') return base.filter(t=>t.done);
+  return base.filter(t=>!t.done).concat(base.filter(t=>t.done));
+}
+
+function updateCounts(){
+  const now = new Date();
+  $('c-all').textContent = ` ${tasks.filter(t=>!t.done).length}`;
+  $('c-today').textContent = ` ${tasks.filter(t=>!t.done && t.due && isSameDay(new Date(t.due), now)).length}`;
+  $('c-overdue').textContent = ` ${tasks.filter(t=>!t.done && t.due && new Date(t.due) < now && !isSameDay(new Date(t.due), now)).length}`;
+  $('c-done').textContent = ` ${tasks.filter(t=>t.done).length}`;
+}
+
+// ===== Dịch nhanh từng việc (bấm khi cần, không đổi nội dung gốc) =====
+let translationCache = {};
+let translationState = {};
+
+async function translateSegment(text, targetLang){
+  if(!text) return '';
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('translate failed');
+  const data = await res.json();
+  return data[0].map(seg=> seg[0]).join('');
+}
+function getDisplayText(t){
+  const st = translationState[t.id];
+  if(st && st.lang && translationCache[t.id] && translationCache[t.id][st.lang]){
+    return translationCache[t.id][st.lang];
+  }
+  return { title: t.title, note: t.note || '' };
+}
+async function toggleTaskTranslate(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  const st = translationState[id];
+  if(st && st.lang){
+    translationState[id] = { lang: null, loading: false };
+    render();
+    return;
+  }
+  if(st && st.loading) return;
+  const hasVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(t.title + (t.note||''));
+  const targetLang = hasVietnamese ? 'en' : 'vi';
+  translationCache[id] = translationCache[id] || {};
+  if(!translationCache[id][targetLang]){
+    translationState[id] = { lang: null, loading: true };
+    render();
+    try{
+      const [title, note] = await Promise.all([
+        translateSegment(t.title, targetLang),
+        t.note ? translateSegment(t.note, targetLang) : Promise.resolve('')
+      ]);
+      translationCache[id][targetLang] = { title, note };
+    }catch(e){
+      translationState[id] = { lang: null, loading: false };
+      render();
+      showToast(T('toastTranslateFail'));
+      return;
+    }
+  }
+  translationState[id] = { lang: targetLang, loading: false };
+  render();
+}
+
+// ===== Nhắc sao lưu định kỳ =====
+const LAST_BACKUP_KEY = 'sotaycv_last_backup';
+const BACKUP_SNOOZE_KEY = 'sotaycv_backup_snooze';
+const BACKUP_REMIND_DAYS = 7;
+const BACKUP_SNOOZE_DAYS = 3;
+
+function recordBackupDone(){
+  localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
+  checkBackupReminder();
+}
+function checkBackupReminder(){
+  const banner = $('backupBanner');
+  if(!tasks.length){ banner.style.display = 'none'; return; }
+  const last = parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10);
+  const snoozeUntil = parseInt(localStorage.getItem(BACKUP_SNOOZE_KEY) || '0', 10);
+  const now = Date.now();
+  if(now < snoozeUntil){ banner.style.display = 'none'; return; }
+  if(!last){
+    $('backupBannerText').textContent = T('backupReminderNever');
+    banner.style.display = 'flex';
+    return;
+  }
+  const daysSince = Math.floor((now - last) / 86400000);
+  if(daysSince >= BACKUP_REMIND_DAYS){
+    $('backupBannerText').textContent = T('backupReminder')(daysSince);
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function render(){
+  updateCounts();
+  const items = filteredTasks();
+  list.innerHTML = '';
+  emptyState.style.display = items.length ? 'none' : 'block';
+  if(!items.length && currentFilter!=='all'){
+    emptyState.querySelector('p').textContent = T('emptyBodyFiltered');
+    emptyState.style.display = 'block';
+  } else if(!items.length){
+    emptyState.querySelector('p').textContent = T('emptyBody');
+  }
+
+  items.forEach(t=>{
+    const status = dueStatus(t);
+    const isSel = selectedIds.has(t.id);
+    const card = document.createElement('div');
+    card.className = `card priority-${t.priority} ${t.done?'done':''} ${status==='overdue'?'overdue':''} ${isSel?'selected':''}`;
+
+    const chips = [];
+    if(t.due){
+      chips.push(`<span class="chip due ${status==='overdue'?'overdue':''} ${status==='today'?'today':''}">${status==='overdue'?'⚠ ':''}${fmtDue(t.due)}</span>`);
+    }
+    chips.push(`<span class="chip pr-${t.priority}">${priorityLabel(t.priority)}</span>`);
+    if(t.category) chips.push(`<span class="chip cat-${t.category}">${categoryLabel(t.category)}</span>`);
+    if(t.images && t.images.length) chips.push(`<span class="chip">📎 ${t.images.length} ảnh</span>`);
+    if(t.files && t.files.length) chips.push(`<span class="chip">📄 ${t.files.length} file</span>`);
+
+    const imgsHtml = (t.images && t.images.length) ? `
+      <div class="card-imgs">
+        ${t.images.map((im,i)=>`<img src="${im.dataUrl}" data-open-img="${t.id}" data-idx="${i}" />`).join('')}
+      </div>` : '';
+
+    const filesHtml = (t.files && t.files.length) ? `
+      <div class="card-files">
+        ${t.files.map(f=>`
+          <div class="file-chip ${f.link ? 'has-link' : ''}" data-open-file="${t.id}" data-fid="${f.id}">
+            <span class="fic">${fileIcon(f.name)}</span>
+            <span class="fname">${escapeHtml(f.name)}</span>
+            <span class="fsize">${fmtFileSize(f.size)}</span>
+            ${f.link ? '<span class="flink">🔗</span>' : (f.pendingUpload ? '<span class="fpending">⏳</span>' : '')}
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const trState = translationState[t.id];
+    const trText = getDisplayText(t);
+    const isTranslated = !!(trState && trState.lang);
+    const isLoading = !!(trState && trState.loading);
+    const trBtnLabel = isLoading ? '⏳' : (isTranslated ? `🌐 ${trState.lang.toUpperCase()}` : '🌐');
+    const trTag = isTranslated ? `<span class="translate-tag">🌐 ${trState.lang==='en' ? T('translatedToEn') : T('translatedToVi')}</span>` : '';
+
+    card.innerHTML = `
+      <button class="del" data-del="${t.id}">×</button>
+      <button class="editBtn" data-edit-btn="${t.id}">✏️</button>
+      <button class="sendBtn" data-send-btn="${t.id}">➤</button>
+      <button class="translateBtn ${isTranslated?'active':''} ${isLoading?'loading':''}" data-translate-btn="${t.id}">${trBtnLabel}</button>
+      <div class="card-top">
+        <div class="check" data-toggle="${t.id}">${selectMode ? (isSel?'✓':'') : (t.done?'✓':'')}</div>
+        <div class="card-body" data-edit="${t.id}">
+          ${trTag}
+          <div class="title ${isTranslated?'translated':''}">${escapeHtml(trText.title)}</div>
+          ${trText.note ? `<div class="note ${isTranslated?'translated':''}">${escapeHtml(trText.note)}</div>` : ''}
+          ${imgsHtml}
+          ${filesHtml}
+          <div class="meta">${chips.join('')}</div>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  list.querySelectorAll('[data-translate-btn]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      toggleTaskTranslate(el.getAttribute('data-translate-btn'));
+    });
+  });
+
+  list.querySelectorAll('[data-toggle]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.getAttribute('data-toggle');
+      selectMode ? toggleSelect(id) : toggleDone(id);
+    });
+  });
+  list.querySelectorAll('[data-del]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      deleteTask(el.getAttribute('data-del'));
+    });
+  });
+  list.querySelectorAll('[data-edit-btn]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openEditSheet(el.getAttribute('data-edit-btn'));
+    });
+  });
+  list.querySelectorAll('[data-send-btn]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const t = tasks.find(x=>x.id===el.getAttribute('data-send-btn'));
+      if(t) shareTasksWithImages([t], false);
+    });
+  });
+  list.querySelectorAll('[data-open-img]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(selectMode){ toggleSelect(el.getAttribute('data-open-img')); return; }
+      const t = tasks.find(x=>x.id===el.getAttribute('data-open-img'));
+      if(t) openLightbox(t.images, Number(el.getAttribute('data-idx')));
+    });
+  });
+  list.querySelectorAll('[data-open-file]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = el.getAttribute('data-open-file');
+      if(selectMode){ toggleSelect(id); return; }
+      const t = tasks.find(x=>x.id===id);
+      const f = t && (t.files||[]).find(x=>x.id===el.getAttribute('data-fid'));
+      if(!f) return;
+      if(f.link) window.open(f.link, '_blank');
+      else openAttachedFile(f.dataUrl, f.name, f.type);
+    });
+  });
+  list.querySelectorAll('[data-edit]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.getAttribute('data-edit');
+      selectMode ? toggleSelect(id) : openEditSheet(id);
+    });
+  });
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ===== Khung xem/sửa việc =====
+function openEditSheet(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  editingId = id;
+  editImages = (t.images || []).slice();
+  editFiles = (t.files || []).slice();
+  $('editTitle').value = t.title;
+  $('editNote').value = t.note || '';
+  $('editDue').value = '';
+  if(t.due){
+    const d = new Date(t.due);
+    const pad = n=>String(n).padStart(2,'0');
+    $('editDue').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  $('editPri').value = t.priority;
+  $('editCat').value = t.category || '';
+  renderEditThumbs();
+  renderEditFiles();
+  $('sheetOverlay').classList.add('show');
+  $('editSheet').classList.add('show');
+}
+
+function closeEditSheet(){
+  $('sheetOverlay').classList.remove('show');
+  $('editSheet').classList.remove('show');
+  editingId = null;
+  editImages = [];
+  editFiles = [];
+}
+
+async function saveEdit(){
+  const t = tasks.find(x=>x.id===editingId);
+  if(!t) return;
+  const title = $('editTitle').value.trim();
+  if(!title){ showToast(T('toastEmptyTitle')); return; }
+  t.title = title;
+  t.note = $('editNote').value.trim();
+  t.due = $('editDue').value ? new Date($('editDue').value).toISOString() : null;
+  t.priority = $('editPri').value;
+  t.category = $('editCat').value;
+  t.images = editImages.slice();
+  t.files = editFiles.slice();
+  closeEditSheet();
+  render();
+  await saveTasks();
+  showToast(T('toastSaved'));
+}
+
+async function deleteFromEdit(){
+  if(!editingId) return;
+  if(!confirm('Xoá việc này?')) return;
+  await deleteTask(editingId);
+  closeEditSheet();
+}
+
+$('sheetOverlay').addEventListener('click', closeEditSheet);
+$('sheetClose').addEventListener('click', closeEditSheet);
+$('editCancelBtn').addEventListener('click', closeEditSheet);
+$('editSaveBtn').addEventListener('click', saveEdit);
+$('editDeleteBtn').addEventListener('click', deleteFromEdit);
+$('editAttachBtn').addEventListener('click', ()=> $('editImgInput').click());
+$('editImgInput').addEventListener('change', async (e)=>{
+  await addImagesToPending(e.target.files, editImages, renderEditThumbs);
+  e.target.value = '';
+});
+$('editPasteBtn').addEventListener('click', ()=> pasteFromClipboard(editImages, renderEditThumbs));
+$('editFileAttachBtn').addEventListener('click', ()=> $('editFileInput').click());
+$('editFileInput').addEventListener('change', async (e)=>{
+  await addFilesToPending(e.target.files, editFiles, renderEditFiles);
+  e.target.value = '';
+});
+
+// ===== Xem ảnh phóng to =====
+function openLightbox(images, idx){
+  lightboxImages = images;
+  lightboxIndex = idx;
+  showLightboxImg();
+  $('lightbox').classList.add('show');
+}
+function showLightboxImg(){
+  $('lightboxImg').src = lightboxImages[lightboxIndex].dataUrl;
+}
+function closeLightbox(){ $('lightbox').classList.remove('show'); }
+$('lbClose').addEventListener('click', closeLightbox);
+$('lightbox').addEventListener('click', (e)=>{ if(e.target.id==='lightbox') closeLightbox(); });
+$('lbPrev').addEventListener('click', ()=>{
+  lightboxIndex = (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length;
+  showLightboxImg();
+});
+$('lbNext').addEventListener('click', ()=>{
+  lightboxIndex = (lightboxIndex + 1) % lightboxImages.length;
+  showLightboxImg();
+});
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    currentFilter = tab.getAttribute('data-filter');
+    render();
+  });
+});
+
+document.querySelectorAll('.cat-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    currentCategory = tab.getAttribute('data-cat');
+    render();
+  });
+});
+
+titleInput.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter' && (e.ctrlKey || e.metaKey)){ addTask(); }
+});
+addBtn.addEventListener('click', addTask);
+dueInput.addEventListener('change', ()=>{
+  dueField.classList.toggle('set', !!dueInput.value);
+});
+
+$('exportBtn').addEventListener('click', exportBackup);
+$('importBtn').addEventListener('click', ()=> $('importFile').click());
+$('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(file) importBackup(file);
+  e.target.value = '';
+});
+
+$('selectModeBtn').addEventListener('click', toggleSelectMode);
+$('sendDoneBtn').addEventListener('click', toggleSelectMode);
+$('sendTextBtn').addEventListener('click', ()=>{
+  const sel = selectedTasksOrdered();
+  if(!sel.length){ showToast(T('toastNoSelection')); return; }
+  shareTasksWithImages(sel, false);
+});
+$('sendImgBtn').addEventListener('click', async ()=>{
+  const sel = selectedTasksOrdered();
+  if(!sel.length){ showToast(T('toastNoSelection')); return; }
+  showToast('Đang chuẩn bị báo cáo...');
+  shareTasksWithImages(sel, true);
+});
+
+// ================== KẾT NỐI ONEDRIVE ==================
+const OD_CLIENTID_KEY = 'sotaycv_od_clientid';
+const OD_FILE_PATH = 'sotaycongviec-baocao.json'; // dữ liệu công việc, lưu trong thư mục riêng của app
+const OD_SCOPES = ['Files.ReadWrite.AppFolder'];
+
+let msalInstance = null;
+let odAccount = null;
+let odSyncTimer = null;
+let odHasPulledOnce = false;
+
+function odGetClientId(){ return localStorage.getItem(OD_CLIENTID_KEY) || ''; }
+
+function setCloudStatus(text, mode){
+  const el = $('cloudStatus');
+  el.textContent = text;
+  el.className = 'cloud-status' + (mode ? ' ' + mode : '');
+}
+
+function updateCloudUI(){
+  const signedIn = !!odAccount;
+  $('cloudSignInBtn').style.display = signedIn ? 'none' : '';
+  $('cloudPushBtn').style.display = signedIn ? '' : 'none';
+  $('cloudPullBtn').style.display = signedIn ? '' : 'none';
+  $('cloudSignOutBtn').style.display = signedIn ? '' : 'none';
+  if(signedIn){
+    setCloudStatus(`☁ ${odAccount.username}`, 'online');
+  } else if(odGetClientId()){
+    setCloudStatus('☁ Chưa đăng nhập', null);
+  } else {
+    setCloudStatus('☁ Chưa cài đặt', null);
+  }
+}
+
+async function initOneDrive(){
+  const clientId = odGetClientId();
+  if(!clientId || typeof msal === 'undefined'){ updateCloudUI(); return; }
+  msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId,
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: 'localStorage' }
+  });
+  try{
+    const resp = await msalInstance.handleRedirectPromise();
+    if(resp && resp.account){
+      odAccount = resp.account;
+    } else {
+      const accs = msalInstance.getAllAccounts();
+      if(accs.length) odAccount = accs[0];
+    }
+  }catch(e){ showToast('Đăng nhập OneDrive thất bại'); }
+  updateCloudUI();
+  if(odAccount && !odHasPulledOnce){
+    odHasPulledOnce = true;
+    if(!tasks.length){ await pullFromOneDrive(true); }
+    await processPendingFileUploads();
+  }
+}
+
+async function odGetToken(){
+  if(!msalInstance || !odAccount) return null;
+  try{
+    const res = await msalInstance.acquireTokenSilent({ scopes: OD_SCOPES, account: odAccount });
+    return res.accessToken;
+  }catch(e){
+    try{
+      const res = await msalInstance.acquireTokenPopup({ scopes: OD_SCOPES, account: odAccount });
+      return res.accessToken;
+    }catch(e2){
+      showToast('Cần đăng nhập lại OneDrive');
+      return null;
+    }
+  }
+}
+
+async function signInOneDrive(){
+  const clientId = odGetClientId();
+  if(!clientId){ openSettingsSheet(); showToast('Hãy dán Client ID trước'); return; }
+  if(!msalInstance) await initOneDrive();
+  try{
+    const resp = await msalInstance.loginPopup({ scopes: OD_SCOPES });
+    odAccount = resp.account;
+    updateCloudUI();
+    showToast('Đã đăng nhập OneDrive');
+    if(!tasks.length) await pullFromOneDrive(true);
+    await processPendingFileUploads();
+  }catch(e){
+    showToast('Đăng nhập thất bại — thử lại');
+  }
+}
+
+function signOutOneDrive(){
+  odAccount = null;
+  if(msalInstance) msalInstance.setActiveAccount(null);
+  updateCloudUI();
+  showToast('Đã đăng xuất OneDrive');
+}
+
+async function pushToOneDrive(silent){
+  const token = await odGetToken();
+  if(!token) return;
+  if(!silent) setCloudStatus('☁ Đang đẩy lên...', 'syncing');
+  try{
+    const blob = new Blob([JSON.stringify(tasks)], {type:'application/json'});
+    if(blob.size <= 4*1024*1024){
+      await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${OD_FILE_PATH}:/content`, {
+        method:'PUT',
+        headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' },
+        body: blob
+      });
+    } else {
+      const sessRes = await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${OD_FILE_PATH}:/createUploadSession`, {
+        method:'POST',
+        headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ item: {'@microsoft.graph.conflictBehavior':'replace'} })
+      });
+      const sess = await sessRes.json();
+      const uploadUrl = sess.uploadUrl;
+      const chunkSize = 5*1024*1024;
+      let start = 0;
+      while(start < blob.size){
+        const end = Math.min(start + chunkSize, blob.size);
+        await fetch(uploadUrl, {
+          method:'PUT',
+          headers:{ 'Content-Range': `bytes ${start}-${end-1}/${blob.size}` },
+          body: blob.slice(start, end)
+        });
+        start = end;
+      }
+    }
+    if(!silent) showToast('Đã đẩy dữ liệu lên OneDrive');
+  }catch(e){
+    if(!silent) showToast('Đẩy lên OneDrive thất bại');
+  }
+  updateCloudUI();
+}
+
+async function pullFromOneDrive(silent){
+  const token = await odGetToken();
+  if(!token) return;
+  setCloudStatus('☁ Đang tải về...', 'syncing');
+  try{
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${OD_FILE_PATH}:/content`, {
+      headers:{ 'Authorization':`Bearer ${token}` }
+    });
+    if(res.status === 404){
+      if(!silent) showToast('Chưa có dữ liệu nào trên OneDrive');
+      updateCloudUI();
+      return;
+    }
+    const data = await res.json();
+    if(Array.isArray(data)){
+      if(silent){
+        tasks = data;
+      } else {
+        const merge = confirm(`OneDrive có ${data.length} việc. OK để GHÉP vào danh sách hiện tại, Cancel để THAY THẾ toàn bộ.`);
+        if(merge){
+          const existingIds = new Set(tasks.map(t=>t.id));
+          data.forEach(t=>{ if(!existingIds.has(t.id)) tasks.push(t); });
+        } else {
+          tasks = data;
+        }
+      }
+      await saveTasks();
+      render();
+      showToast('Đã tải dữ liệu từ OneDrive');
+    }
+  }catch(e){
+    if(!silent) showToast('Tải từ OneDrive thất bại');
+  }
+  updateCloudUI();
+}
+
+function scheduleAutoSync(){
+  if(!odAccount) return;
+  clearTimeout(odSyncTimer);
+  odSyncTimer = setTimeout(()=> pushToOneDrive(true), 2500);
+}
+
+// ===== Tải file đính kèm lên OneDrive + tự tạo link sao lưu =====
+async function odUploadAndGetLink(dataUrl, name, mime){
+  const token = await odGetToken();
+  if(!token) throw new Error('Chưa đăng nhập OneDrive');
+  const blob = await dataUrlToBlob(dataUrl);
+  const safeName = `${Date.now()}_${name}`.replace(/[#%&*:<>?/{|}\\]/g, '_');
+  const path = `attachments/${safeName}`;
+  let itemId;
+
+  if(blob.size <= 4*1024*1024){
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${encodeURIComponent(path)}:/content`, {
+      method:'PUT',
+      headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type': mime || 'application/octet-stream' },
+      body: blob
+    });
+    const data = await res.json();
+    if(!data.id) throw new Error('Tải file lên thất bại');
+    itemId = data.id;
+  } else {
+    const sessRes = await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${encodeURIComponent(path)}:/createUploadSession`, {
+      method:'POST',
+      headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ item: {'@microsoft.graph.conflictBehavior':'replace'} })
+    });
+    const sess = await sessRes.json();
+    const uploadUrl = sess.uploadUrl;
+    const chunkSize = 5*1024*1024;
+    let start = 0;
+    let lastData = null;
+    while(start < blob.size){
+      const end = Math.min(start + chunkSize, blob.size);
+      const r = await fetch(uploadUrl, {
+        method:'PUT',
+        headers:{ 'Content-Range': `bytes ${start}-${end-1}/${blob.size}` },
+        body: blob.slice(start, end)
+      });
+      if(end >= blob.size) lastData = await r.json();
+      start = end;
+    }
+    if(!lastData || !lastData.id) throw new Error('Tải file lên thất bại');
+    itemId = lastData.id;
+  }
+
+  // Tạo link chia sẻ — ưu tiên "ai có link đều xem được"; nếu tổ chức chặn link
+  // công khai thì thử link nội bộ tổ chức
+  let link = await odCreateLink(itemId, token, 'anonymous');
+  if(!link) link = await odCreateLink(itemId, token, 'organization');
+  if(!link) throw new Error('Không tạo được link chia sẻ');
+  return link;
+}
+
+async function odCreateLink(itemId, token, scope){
+  try{
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${itemId}/createLink`, {
+      method:'POST',
+      headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ type:'view', scope })
+    });
+    const data = await res.json();
+    return (data.link && data.link.webUrl) || null;
+  }catch(e){ return null; }
+}
+
+// Với các file đã đính kèm từ trước lúc chưa đăng nhập (hoặc lần tải lên trước
+// bị lỗi) — tự động tải bù lên OneDrive ngay khi kết nối được
+async function processPendingFileUploads(){
+  if(!odAccount) return;
+  let changed = false;
+  for(const t of tasks){
+    for(const f of (t.files||[])){
+      if(!f.link && f.dataUrl){
+        try{
+          const link = await odUploadAndGetLink(f.dataUrl, f.name, f.type);
+          f.link = link;
+          f.dataUrl = null;
+          f.pendingUpload = false;
+          changed = true;
+        }catch(e){ /* để lần kết nối sau thử lại */ }
+      }
+    }
+  }
+  if(changed){
+    render();
+    await saveTasks();
+    showToast('Đã tự động sao lưu các file còn thiếu lên OneDrive');
+  }
+}
+
+// ===== Khung Cài đặt =====
+function openSettingsSheet(){
+  $('clientIdInput').value = odGetClientId();
+  $('settingsOverlay').classList.add('show');
+  $('settingsSheet').classList.add('show');
+}
+function closeSettingsSheet(){
+  $('settingsOverlay').classList.remove('show');
+  $('settingsSheet').classList.remove('show');
+}
+$('cloudSettingsBtn').addEventListener('click', openSettingsSheet);
+$('settingsClose').addEventListener('click', closeSettingsSheet);
+$('settingsOverlay').addEventListener('click', closeSettingsSheet);
+$('clientIdSaveBtn').addEventListener('click', async ()=>{
+  const id = $('clientIdInput').value.trim();
+  if(!id){ showToast('Chưa nhập Client ID'); return; }
+  localStorage.setItem(OD_CLIENTID_KEY, id);
+  closeSettingsSheet();
+  showToast('Đã lưu Client ID');
+  await initOneDrive();
+});
+
+$('cloudSignInBtn').addEventListener('click', signInOneDrive);
+$('cloudSignOutBtn').addEventListener('click', signOutOneDrive);
+$('cloudPushBtn').addEventListener('click', ()=> pushToOneDrive(false));
+$('cloudPullBtn').addEventListener('click', ()=> pullFromOneDrive(false));
+
+$('langViBtn').addEventListener('click', ()=> setLanguage('vi'));
+$('langEnBtn').addEventListener('click', ()=> setLanguage('en'));
+$('backupBannerBackupBtn').addEventListener('click', exportBackup);
+$('backupBannerSnoozeBtn').addEventListener('click', ()=>{
+  localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + BACKUP_SNOOZE_DAYS*86400000));
+  $('backupBanner').style.display = 'none';
+});
+applyStaticI18n();
+
+fmtDateHeader();
+loadTasks().then(()=>{ checkBackupReminder(); return initOneDrive(); });
+</script>
+</body>
+</html>
