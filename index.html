@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Sổ Tay Công Việc — OneDrive</title>
 <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script>
+// Máy chủ chính (Mỹ) đôi khi không tải được trên một số mạng — tự động chuyển
+// sang máy chủ dự phòng (Châu Âu) của chính Microsoft nếu vậy
+if(typeof msal === 'undefined'){
+  document.write(unescape("%3Cscript src='https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js' type='text/javascript'%3E%3C/script%3E"));
+}
+</script>
 <style>
   :root{
     --ink-900:#0B1F33;
@@ -2003,7 +2010,12 @@ function updateCloudUI(){
 
 async function initOneDrive(){
   const clientId = odGetClientId();
-  if(!clientId || typeof msal === 'undefined'){ updateCloudUI(); return; }
+  if(!clientId){ updateCloudUI(); return; }
+  if(typeof msal === 'undefined'){
+    updateCloudUI();
+    setCloudStatus('☁ Không tải được thư viện đăng nhập — kiểm tra mạng', null);
+    return;
+  }
   msalInstance = new msal.PublicClientApplication({
     auth: {
       clientId,
@@ -2058,6 +2070,10 @@ async function signInOneDrive(){
   const clientId = odGetClientId();
   if(!clientId){ openSettingsSheet(); showToast('Hãy dán Client ID trước'); return; }
   if(!msalInstance) await initOneDrive();
+  if(!msalInstance){
+    showToast('Không tải được thư viện đăng nhập Microsoft — kiểm tra mạng/chặn quảng cáo rồi tải lại trang (F5)');
+    return;
+  }
   // Dùng chuyển hướng cả trang thay vì mở cửa sổ popup nhỏ — cửa sổ popup rất hay
   // bị trình duyệt chặn (đặc biệt khi mở nhiều tab cùng lúc), gây "Đăng nhập thất
   // bại" ngay lập tức mà không rõ lý do. Chuyển hướng cả trang luôn mở được.
