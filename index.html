@@ -847,7 +847,7 @@ function showToast(msg){
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(()=>toastEl.classList.remove('show'), 1600);
+  showToast._t = setTimeout(()=>toastEl.classList.remove('show'), 3200);
 }
 
 function fmtDateHeader(){
@@ -2044,6 +2044,16 @@ async function odGetToken(){
   }
 }
 
+function clearStuckMsalState(){
+  // Dọn "cờ trạng thái đang tương tác" bị kẹt lại từ những lần thử đăng nhập
+  // trước đó bị lỗi (vd cửa sổ popup bị chặn) — nếu không dọn, MSAL sẽ luôn từ
+  // chối mọi lần đăng nhập sau đó ngay lập tức với lỗi "interaction_in_progress"
+  try{
+    Object.keys(localStorage).forEach(k=>{ if(k.startsWith('msal.')) localStorage.removeItem(k); });
+    Object.keys(sessionStorage).forEach(k=>{ if(k.startsWith('msal.')) sessionStorage.removeItem(k); });
+  }catch(e){}
+}
+
 async function signInOneDrive(){
   const clientId = odGetClientId();
   if(!clientId){ openSettingsSheet(); showToast('Hãy dán Client ID trước'); return; }
@@ -2057,7 +2067,23 @@ async function signInOneDrive(){
     // nhập xong, Microsoft tự đưa bạn quay lại app, và initOneDrive() ở đầu trang
     // sẽ đọc kết quả đăng nhập qua handleRedirectPromise().
   }catch(e){
-    showToast('Đăng nhập thất bại — thử lại');
+    console.error('OneDrive sign-in error:', e);
+    const code = (e && (e.errorCode || e.message)) || '';
+    if(/interaction_in_progress/i.test(code)){
+      // Tự dọn trạng thái bị kẹt rồi thử lại đúng 1 lần
+      clearStuckMsalState();
+      try{
+        msalInstance = null;
+        await initOneDrive();
+        await msalInstance.loginRedirect({ scopes: OD_SCOPES });
+        return;
+      }catch(e2){
+        console.error('OneDrive sign-in retry error:', e2);
+        showToast('Lỗi: ' + ((e2 && (e2.errorCode || e2.message)) || 'không rõ nguyên nhân'));
+        return;
+      }
+    }
+    showToast('Lỗi: ' + (code || 'không rõ nguyên nhân'));
   }
 }
 
