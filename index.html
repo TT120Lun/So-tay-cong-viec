@@ -2016,6 +2016,7 @@ async function initOneDrive(){
     const resp = await msalInstance.handleRedirectPromise();
     if(resp && resp.account){
       odAccount = resp.account;
+      showToast(currentLang==='en' ? 'Signed in to OneDrive' : 'Đã đăng nhập OneDrive');
     } else {
       const accs = msalInstance.getAllAccounts();
       if(accs.length) odAccount = accs[0];
@@ -2035,13 +2036,11 @@ async function odGetToken(){
     const res = await msalInstance.acquireTokenSilent({ scopes: OD_SCOPES, account: odAccount });
     return res.accessToken;
   }catch(e){
-    try{
-      const res = await msalInstance.acquireTokenPopup({ scopes: OD_SCOPES, account: odAccount });
-      return res.accessToken;
-    }catch(e2){
-      showToast('Cần đăng nhập lại OneDrive');
-      return null;
-    }
+    // Không dùng cửa sổ popup để làm mới quyền (hay bị trình duyệt chặn) —
+    // chuyển hẳn trang sang Microsoft rồi quay lại
+    showToast('Cần đăng nhập lại OneDrive...');
+    await msalInstance.acquireTokenRedirect({ scopes: OD_SCOPES, account: odAccount });
+    return null; // trang sẽ chuyển hướng, đoạn code sau đây sẽ không chạy tới
   }
 }
 
@@ -2049,13 +2048,14 @@ async function signInOneDrive(){
   const clientId = odGetClientId();
   if(!clientId){ openSettingsSheet(); showToast('Hãy dán Client ID trước'); return; }
   if(!msalInstance) await initOneDrive();
+  // Dùng chuyển hướng cả trang thay vì mở cửa sổ popup nhỏ — cửa sổ popup rất hay
+  // bị trình duyệt chặn (đặc biệt khi mở nhiều tab cùng lúc), gây "Đăng nhập thất
+  // bại" ngay lập tức mà không rõ lý do. Chuyển hướng cả trang luôn mở được.
   try{
-    const resp = await msalInstance.loginPopup({ scopes: OD_SCOPES });
-    odAccount = resp.account;
-    updateCloudUI();
-    showToast('Đã đăng nhập OneDrive');
-    if(!tasks.length) await pullFromOneDrive(true);
-    await processPendingFileUploads();
+    await msalInstance.loginRedirect({ scopes: OD_SCOPES });
+    // Trang sẽ rời đi ngay đây để tới màn hình đăng nhập Microsoft; sau khi đăng
+    // nhập xong, Microsoft tự đưa bạn quay lại app, và initOneDrive() ở đầu trang
+    // sẽ đọc kết quả đăng nhập qua handleRedirectPromise().
   }catch(e){
     showToast('Đăng nhập thất bại — thử lại');
   }
