@@ -659,6 +659,7 @@ var st,ct,ut,lt,dt,ht,pt,gt,ft,mt=function(){function t(e,t,r){this.networkInter
     <div class="send-bar-actions">
       <button class="btn" id="sendTextBtn" data-i18n="sendTextBtn">📝 Gửi dạng chữ</button>
       <button class="btn" id="sendImgBtn" data-i18n="sendImgBtn">🖼 Gửi dạng ảnh</button>
+      <button class="btn" id="copyForZaloBtn" data-i18n="copyForZaloBtn">📋 Copy để dán Zalo</button>
       <button class="btn danger" id="sendDoneBtn" data-i18n="sendDoneBtn">Xong</button>
     </div>
   </div>
@@ -817,6 +818,7 @@ const I18N = {
     backupReminderNever: '💡 Bạn chưa từng sao lưu dữ liệu ra khỏi máy. Nên sao lưu ngay để phòng mất dữ liệu.',
     backupReminder: n=> `💡 Đã ${n} ngày chưa sao lưu dữ liệu. Bấm sao lưu để an toàn hơn.`,
     backupNowBtn: 'Sao lưu ngay', backupSnoozeBtn: 'Để sau',
+    linkPending: 'đang tải lên OneDrive, xem link ở lần gửi sau', copyForZaloBtn: '📋 Copy để dán Zalo',
   },
   en: {
     brand: 'TASK&nbsp;NOTEBOOK',
@@ -854,6 +856,7 @@ const I18N = {
     backupReminderNever: '💡 You have never backed up your data outside this device. Back up now to avoid losing it.',
     backupReminder: n=> `💡 It's been ${n} days since your last backup. Back up now to stay safe.`,
     backupNowBtn: 'Backup now', backupSnoozeBtn: 'Later',
+    linkPending: 'uploading to OneDrive, link will show next time', copyForZaloBtn: '📋 Copy to paste in Zalo',
   }
 };
 let currentLang = localStorage.getItem('sotaycv_lang') || 'vi';
@@ -1404,6 +1407,7 @@ function buildReportText(list){
     if(t.files && t.files.length){
       t.files.forEach(f=>{
         if(f.link) block += `\n   📎 ${f.name}: ${f.link}`;
+        else block += `\n   📎 ${f.name}: (${T('linkPending')})`;
       });
     }
     return block;
@@ -2040,6 +2044,13 @@ $('sendImgBtn').addEventListener('click', async ()=>{
   showToast('Đang chuẩn bị báo cáo...');
   shareTasksWithImages(sel, true);
 });
+$('copyForZaloBtn').addEventListener('click', ()=>{
+  const sel = selectedTasksOrdered();
+  if(!sel.length){ showToast(T('toastNoSelection')); return; }
+  // Bỏ qua hẳn bảng Chia sẻ của hệ điều hành — trên Windows, Zalo bản PC
+  // không đăng ký vào bảng Chia sẻ được, nên mở thẳng khung copy để dán tay
+  openShareFallback(buildReportText(sel), '');
+});
 
 // ================== KẾT NỐI ONEDRIVE ==================
 const OD_CLIENTID_KEY = 'sotaycv_od_clientid';
@@ -2103,9 +2114,39 @@ async function initOneDrive(){
   updateCloudUI();
   if(odAccount && !odHasPulledOnce){
     odHasPulledOnce = true;
-    if(!tasks.length){ await pullFromOneDrive(true); }
+    if(!tasks.length){
+      await pullFromOneDrive(true);
+    } else {
+      // Máy này đã có dữ liệu sẵn -> chỉ ÂM THẦM BỔ SUNG việc mới được tạo từ
+      // thiết bị khác (không đụng/không xoá gì đang có ở đây), để mở trên
+      // điện thoại, laptop, tablet đều thấy đủ việc mới nhất mà không lo mất dữ liệu
+      await mergeFromOneDriveSilently();
+    }
     await processPendingFileUploads();
   }
+}
+
+async function mergeFromOneDriveSilently(){
+  const token = await odGetToken();
+  if(!token) return;
+  try{
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${OD_FILE_PATH}:/content`, {
+      headers:{ 'Authorization':`Bearer ${token}` }
+    });
+    if(res.status === 404) return;
+    const data = await res.json();
+    if(!Array.isArray(data)) return;
+    const existingIds = new Set(tasks.map(t=>t.id));
+    let added = 0;
+    data.forEach(t=>{ if(!existingIds.has(t.id)){ tasks.push(t); added++; } });
+    if(added > 0){
+      await saveTasks();
+      render();
+      showToast(currentLang==='en'
+        ? `Synced ${added} new task(s) from other devices`
+        : `Đã đồng bộ thêm ${added} việc từ thiết bị khác`);
+    }
+  }catch(e){ /* lỗi mạng thoáng qua -> bỏ qua, không làm phiền người dùng */ }
 }
 
 async function odGetToken(){
