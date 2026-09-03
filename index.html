@@ -1167,13 +1167,22 @@ async function addFilesToPending(fileList, targetArr, renderFn){
   for(const file of Array.from(fileList)){
     if(odAccount){
       // Đã đăng nhập OneDrive -> tải THẲNG file gốc lên (không đổi sang chữ base64
-      // trước như cách cũ — cách cũ vừa chậm vừa tốn thêm ~33% dung lượng, hay bị
-      // treo với file lớn). Nhờ vậy hỗ trợ được file tới 2GB.
+      // trước như cách cũ). Với file vừa/nhỏ (≤25MB — đa số trường hợp), vẫn giữ
+      // thêm 1 bản dự phòng tạm trong máy cho tới khi CHẮC CHẮN tải lên xong —
+      // để nếu bạn Lưu/refresh trang giữa chừng (huỷ ngang việc đang tải lên dở),
+      // dữ liệu vẫn còn, lần mở lại app sẽ tự động thử tải lên lại. Chỉ file thật
+      // sự lớn (>25MB, tới 2GB) mới không giữ được bản dự phòng này.
       if(file.size > ONEDRIVE_FILE_MAX){
         showToast(`"${file.name}" quá lớn (>2GB) — bỏ qua`);
         continue;
       }
       const entry = { id: genId(), name: file.name, size: file.size, type: file.type, dataUrl: null, link: null, pendingUpload: true, progress: 0 };
+      if(file.size <= LOCAL_FILE_MAX){
+        try{ entry.dataUrl = await readFileAsDataUrl(file); }
+        catch(e){ /* không đọc được bản dự phòng thì vẫn cứ thử tải thẳng lên */ }
+      } else {
+        showToast(`"${file.name}" khá lớn — hãy giữ trang này mở cho tới khi thấy 🔗, đừng tắt/tải lại trang giữa chừng`);
+      }
       targetArr.push(entry);
       renderFn();
       uploadFileObjectAndAttachLink(file, entry, renderFn);
@@ -1201,6 +1210,7 @@ async function uploadFileObjectAndAttachLink(file, entry, renderFn){
     entry.link = link;
     entry.pendingUpload = false;
     entry.progress = null;
+    entry.dataUrl = null; // đã có link sao lưu, giải phóng bản dự phòng tạm trong máy
     renderFn();
     await saveTasks();
     showToast(`Đã sao lưu "${entry.name}" lên OneDrive`);
@@ -1208,7 +1218,14 @@ async function uploadFileObjectAndAttachLink(file, entry, renderFn){
     entry.pendingUpload = false;
     entry.progress = null;
     renderFn();
-    showToast(`Tải "${entry.name}" lên OneDrive thất bại — thử đính kèm lại`);
+    // Nếu còn bản dự phòng cục bộ (dataUrl) thì không mất dữ liệu — lần sau mở
+    // app lên sẽ tự động thử tải lên lại (xem processPendingFileUploads)
+    if(entry.dataUrl){
+      await saveTasks();
+      showToast(`Tải "${entry.name}" lên OneDrive chưa xong — đã giữ tạm trong máy, sẽ tự thử lại`);
+    } else {
+      showToast(`Tải "${entry.name}" lên OneDrive thất bại — file lớn không có bản dự phòng, hãy đính kèm lại`);
+    }
   }
 }
 
