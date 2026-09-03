@@ -1160,31 +1160,76 @@ function readFileAsDataUrl(file){
     reader.readAsDataURL(file);
   });
 }
+const LOCAL_FILE_MAX = 25*1024*1024;      // Giới hạn khi CHƯA đăng nhập OneDrive (phải lưu tạm dạng chữ trong máy)
+const ONEDRIVE_FILE_MAX = 2*1024*1024*1024; // Giới hạn khi ĐÃ đăng nhập OneDrive (tải thẳng lên, không giữ bản cục bộ)
+
 async function addFilesToPending(fileList, targetArr, renderFn){
   for(const file of Array.from(fileList)){
-    if(file.size > 20*1024*1024){ showToast(`"${file.name}" quá lớn (>20MB) — bỏ qua`); continue; }
-    const entry = { id: genId(), name: file.name, size: file.size, type: file.type, dataUrl: null, link: null, pendingUpload: true };
-    try{
-      entry.dataUrl = await readFileAsDataUrl(file);
-    }catch(e){ showToast(`Không đọc được file "${file.name}"`); continue; }
-    targetArr.push(entry);
-    // Đã kết nối OneDrive -> tự động tải file lên nền và gán link sao lưu ngay
-    if(odAccount) uploadFileAndAttachLink(entry, renderFn);
-    else entry.pendingUpload = false;
+    if(odAccount){
+      // Đã đăng nhập OneDrive -> tải THẲNG file gốc lên (không đổi sang chữ base64
+      // trước như cách cũ — cách cũ vừa chậm vừa tốn thêm ~33% dung lượng, hay bị
+      // treo với file lớn). Nhờ vậy hỗ trợ được file tới 2GB.
+      if(file.size > ONEDRIVE_FILE_MAX){
+        showToast(`"${file.name}" quá lớn (>2GB) — bỏ qua`);
+        continue;
+      }
+      const entry = { id: genId(), name: file.name, size: file.size, type: file.type, dataUrl: null, link: null, pendingUpload: true, progress: 0 };
+      targetArr.push(entry);
+      renderFn();
+      uploadFileObjectAndAttachLink(file, entry, renderFn);
+    } else {
+      if(file.size > LOCAL_FILE_MAX){
+        showToast(`"${file.name}" quá lớn để lưu tạm trong máy (>25MB) — đăng nhập OneDrive để gửi file lớn hơn`);
+        continue;
+      }
+      const entry = { id: genId(), name: file.name, size: file.size, type: file.type, dataUrl: null, link: null, pendingUpload: false };
+      try{
+        entry.dataUrl = await readFileAsDataUrl(file);
+      }catch(e){ showToast(`Không đọc được file "${file.name}"`); continue; }
+      targetArr.push(entry);
+    }
   }
   renderFn();
 }
-async function uploadFileAndAttachLink(entry, renderFn){
+
+async function uploadFileObjectAndAttachLink(file, entry, renderFn){
   try{
-    const link = await odUploadAndGetLink(entry.dataUrl, entry.name, entry.type);
+    const link = await odUploadBlobAndGetLink(file, entry.name, entry.type, (loaded, total)=>{
+      entry.progress = total ? Math.round(loaded/total*100) : null;
+      renderFn();
+    });
     entry.link = link;
     entry.pendingUpload = false;
+    entry.progress = null;
+    renderFn();
+    await saveTasks();
+    showToast(`Đã sao lưu "${entry.name}" lên OneDrive`);
+  }catch(e){
+    entry.pendingUpload = false;
+    entry.progress = null;
+    renderFn();
+    showToast(`Tải "${entry.name}" lên OneDrive thất bại — thử đính kèm lại`);
+  }
+}
+
+// Giữ lại để dùng cho file cũ đã lưu tạm dạng chữ (base64) từ trước khi đăng nhập
+async function uploadFileAndAttachLink(entry, renderFn){
+  try{
+    const blob = await dataUrlToBlob(entry.dataUrl);
+    const link = await odUploadBlobAndGetLink(blob, entry.name, entry.type, (loaded, total)=>{
+      entry.progress = total ? Math.round(loaded/total*100) : null;
+      renderFn();
+    });
+    entry.link = link;
+    entry.pendingUpload = false;
+    entry.progress = null;
     entry.dataUrl = null; // đã có link sao lưu, giải phóng bộ nhớ cục bộ
     renderFn();
     await saveTasks();
     showToast(`Đã sao lưu "${entry.name}" lên OneDrive`);
   }catch(e){
     entry.pendingUpload = false;
+    entry.progress = null;
     renderFn();
   }
 }
@@ -1194,7 +1239,7 @@ function renderFileStrip(container, arr, onRemove){
       <span class="fic">${fileIcon(f.name)}</span>
       <span class="fname">${escapeHtml(f.name)}</span>
       <span class="fsize">${fmtFileSize(f.size)}</span>
-      ${f.link ? '<span class="flink">🔗 đã sao lưu</span>' : (f.pendingUpload ? '<span class="fpending">⏳ đang tải lên</span>' : '')}
+      ${f.link ? '<span class="flink">🔗 đã sao lưu</span>' : (f.pendingUpload ? `<span class="fpending">⏳ ${f.progress!=null ? f.progress+'%' : 'đang tải lên'}</span>` : '')}
       <button class="rm" data-frm="${f.id}">×</button>
     </div>
   `).join('');
@@ -1804,7 +1849,7 @@ function render(){
             <span class="fic">${fileIcon(f.name)}</span>
             <span class="fname">${escapeHtml(f.name)}</span>
             <span class="fsize">${fmtFileSize(f.size)}</span>
-            ${f.link ? '<span class="flink">🔗</span>' : (f.pendingUpload ? '<span class="fpending">⏳</span>' : '')}
+            ${f.link ? '<span class="flink">🔗</span>' : (f.pendingUpload ? `<span class="fpending">⏳${f.progress!=null ? ' '+f.progress+'%' : ''}</span>` : '')}
           </div>
         `).join('')}
       </div>` : '';
@@ -2299,10 +2344,12 @@ function scheduleAutoSync(){
 }
 
 // ===== Tải file đính kèm lên OneDrive + tự tạo link sao lưu =====
-async function odUploadAndGetLink(dataUrl, name, mime){
+// Nhận thẳng Blob/File gốc (không cần đổi qua dạng chữ base64 trước) — nhờ vậy
+// nhẹ hơn nhiều và hỗ trợ được file lớn (tới 2GB). onProgress(loaded, total)
+// được gọi sau mỗi phần tải lên để hiển thị % tiến độ.
+async function odUploadBlobAndGetLink(blob, name, mime, onProgress){
   const token = await odGetToken();
   if(!token) throw new Error('Chưa đăng nhập OneDrive');
-  const blob = await dataUrlToBlob(dataUrl);
   const safeName = `${Date.now()}_${name}`.replace(/[#%&*:<>?/{|}\\]/g, '_');
   const path = `attachments/${safeName}`;
   let itemId;
@@ -2316,6 +2363,7 @@ async function odUploadAndGetLink(dataUrl, name, mime){
     const data = await res.json();
     if(!data.id) throw new Error('Tải file lên thất bại');
     itemId = data.id;
+    if(onProgress) onProgress(blob.size, blob.size);
   } else {
     const sessRes = await fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot:/${encodeURIComponent(path)}:/createUploadSession`, {
       method:'POST',
@@ -2324,7 +2372,10 @@ async function odUploadAndGetLink(dataUrl, name, mime){
     });
     const sess = await sessRes.json();
     const uploadUrl = sess.uploadUrl;
-    const chunkSize = 5*1024*1024;
+    if(!uploadUrl) throw new Error('Không tạo được phiên tải lên');
+    // Cỡ phần tải: phải là bội số của 320KiB theo yêu cầu của Graph API.
+    // Dùng phần lớn hơn (~10MB) cho file lớn để giảm số lần gọi mạng, đỡ chậm.
+    const chunkSize = blob.size > 100*1024*1024 ? 10*1024*1024 : 5*1024*1024;
     let start = 0;
     let lastData = null;
     while(start < blob.size){
@@ -2334,8 +2385,12 @@ async function odUploadAndGetLink(dataUrl, name, mime){
         headers:{ 'Content-Range': `bytes ${start}-${end-1}/${blob.size}` },
         body: blob.slice(start, end)
       });
+      if(!r.ok && r.status !== 202){
+        throw new Error(`Tải lên thất bại ở phần ${start}-${end} (mã lỗi ${r.status})`);
+      }
       if(end >= blob.size) lastData = await r.json();
       start = end;
+      if(onProgress) onProgress(start, blob.size);
     }
     if(!lastData || !lastData.id) throw new Error('Tải file lên thất bại');
     itemId = lastData.id;
@@ -2347,6 +2402,12 @@ async function odUploadAndGetLink(dataUrl, name, mime){
   if(!link) link = await odCreateLink(itemId, token, 'organization');
   if(!link) throw new Error('Không tạo được link chia sẻ');
   return link;
+}
+
+// Tương thích ngược: dùng cho các file cũ còn lưu tạm dạng chữ (base64) cục bộ
+async function odUploadAndGetLink(dataUrl, name, mime){
+  const blob = await dataUrlToBlob(dataUrl);
+  return odUploadBlobAndGetLink(blob, name, mime);
 }
 
 async function odCreateLink(itemId, token, scope){
