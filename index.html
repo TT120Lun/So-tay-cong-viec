@@ -1386,7 +1386,8 @@ async function addTask(){
     images: pendingImages.slice(),
     files: pendingFiles.slice(),
     done: false,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   tasks.unshift(task);
   titleInput.value = '';
@@ -1411,6 +1412,7 @@ async function toggleDone(id){
   const t = tasks.find(x=>x.id===id);
   if(!t) return;
   t.done = !t.done;
+  t.updatedAt = new Date().toISOString();
   render();
   await saveTasks();
 }
@@ -2007,6 +2009,7 @@ async function saveEdit(){
   t.category = $('editCat').value;
   t.images = editImages.slice();
   t.files = editFiles.slice();
+  t.updatedAt = new Date().toISOString();
   closeEditSheet();
   render();
   await saveTasks();
@@ -2188,6 +2191,10 @@ async function initOneDrive(){
   }
 }
 
+function taskUpdatedTime(t){
+  return t && t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+}
+
 async function mergeFromOneDriveSilently(){
   const token = await odGetToken();
   if(!token) return;
@@ -2198,15 +2205,30 @@ async function mergeFromOneDriveSilently(){
     if(res.status === 404) return;
     const data = await res.json();
     if(!Array.isArray(data)) return;
-    const existingIds = new Set(tasks.map(t=>t.id));
-    let added = 0;
-    data.forEach(t=>{ if(!existingIds.has(t.id)){ tasks.push(t); added++; } });
-    if(added > 0){
+    const localById = new Map(tasks.map(t=>[t.id, t]));
+    let added = 0, updated = 0;
+    data.forEach(cloudT=>{
+      const localT = localById.get(cloudT.id);
+      if(!localT){
+        tasks.push(cloudT);
+        added++;
+      } else if(taskUpdatedTime(cloudT) > taskUpdatedTime(localT)){
+        // Việc này đã được sửa gần hơn ở thiết bị khác (vd thêm file đính kèm) ->
+        // dùng bản mới hơn đó thay cho bản đang có ở máy này
+        const idx = tasks.findIndex(x=>x.id===cloudT.id);
+        if(idx !== -1) tasks[idx] = cloudT;
+        updated++;
+      }
+    });
+    if(added > 0 || updated > 0){
       await saveTasks();
       render();
+      const parts = [];
+      if(added) parts.push(currentLang==='en' ? `${added} new` : `${added} việc mới`);
+      if(updated) parts.push(currentLang==='en' ? `${updated} updated` : `${updated} việc cập nhật`);
       showToast(currentLang==='en'
-        ? `Synced ${added} new task(s) from other devices`
-        : `Đã đồng bộ thêm ${added} việc từ thiết bị khác`);
+        ? `Synced from other devices: ${parts.join(', ')}`
+        : `Đã đồng bộ từ thiết bị khác: ${parts.join(', ')}`);
     }
   }catch(e){ /* lỗi mạng thoáng qua -> bỏ qua, không làm phiền người dùng */ }
 }
@@ -2452,6 +2474,7 @@ async function processPendingFileUploads(){
           f.link = link;
           f.dataUrl = null;
           f.pendingUpload = false;
+          t.updatedAt = new Date().toISOString();
           changed = true;
         }catch(e){ /* để lần kết nối sau thử lại */ }
       }
