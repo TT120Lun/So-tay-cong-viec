@@ -2194,6 +2194,9 @@ async function initOneDrive(){
 function taskUpdatedTime(t){
   return t && t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
 }
+function countAttachments(t){
+  return (t && t.files ? t.files.length : 0) + (t && t.images ? t.images.length : 0);
+}
 
 async function mergeFromOneDriveSilently(){
   const token = await odGetToken();
@@ -2212,9 +2215,14 @@ async function mergeFromOneDriveSilently(){
       if(!localT){
         tasks.push(cloudT);
         added++;
-      } else if(taskUpdatedTime(cloudT) > taskUpdatedTime(localT)){
-        // Việc này đã được sửa gần hơn ở thiết bị khác (vd thêm file đính kèm) ->
-        // dùng bản mới hơn đó thay cho bản đang có ở máy này
+        return;
+      }
+      const cloudNewer = taskUpdatedTime(cloudT) > taskUpdatedTime(localT);
+      // Nhiều việc cũ (sửa trước khi có "dấu thời gian sửa") không so sánh được
+      // theo thời gian -> dùng thêm dấu hiệu phụ: bản nào có nhiều ảnh/file đính
+      // kèm hơn coi như đầy đủ hơn, ưu tiên dùng bản đó
+      const cloudHasMoreAttachments = countAttachments(cloudT) > countAttachments(localT);
+      if(cloudNewer || cloudHasMoreAttachments){
         const idx = tasks.findIndex(x=>x.id===cloudT.id);
         if(idx !== -1) tasks[idx] = cloudT;
         updated++;
