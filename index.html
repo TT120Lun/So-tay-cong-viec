@@ -2276,8 +2276,11 @@ async function signInOneDrive(){
   // Dùng chuyển hướng cả trang thay vì mở cửa sổ popup nhỏ — cửa sổ popup rất hay
   // bị trình duyệt chặn (đặc biệt khi mở nhiều tab cùng lúc), gây "Đăng nhập thất
   // bại" ngay lập tức mà không rõ lý do. Chuyển hướng cả trang luôn mở được.
+  // prompt:'login' bắt Microsoft LUÔN hiện lại màn hình nhập mật khẩu, không tự
+  // động đăng nhập lại bằng phiên cũ còn lưu trong trình duyệt — quan trọng khi
+  // nhiều người dùng chung 1 máy/trình duyệt, tránh nhầm sang tài khoản người khác.
   try{
-    await msalInstance.loginRedirect({ scopes: OD_SCOPES });
+    await msalInstance.loginRedirect({ scopes: OD_SCOPES, prompt: 'login' });
     // Trang sẽ rời đi ngay đây để tới màn hình đăng nhập Microsoft; sau khi đăng
     // nhập xong, Microsoft tự đưa bạn quay lại app, và initOneDrive() ở đầu trang
     // sẽ đọc kết quả đăng nhập qua handleRedirectPromise().
@@ -2290,7 +2293,7 @@ async function signInOneDrive(){
       try{
         msalInstance = null;
         await initOneDrive();
-        await msalInstance.loginRedirect({ scopes: OD_SCOPES });
+        await msalInstance.loginRedirect({ scopes: OD_SCOPES, prompt: 'login' });
         return;
       }catch(e2){
         console.error('OneDrive sign-in retry error:', e2);
@@ -2302,10 +2305,25 @@ async function signInOneDrive(){
   }
 }
 
-function signOutOneDrive(){
+async function signOutOneDrive(){
+  const account = odAccount;
   odAccount = null;
-  if(msalInstance) msalInstance.setActiveAccount(null);
   updateCloudUI();
+  // Đăng xuất THẬT SỰ khỏi phiên Microsoft (không chỉ ẩn trên app) — để lần đăng
+  // nhập kế tiếp chắc chắn phải nhập lại tài khoản/mật khẩu, không tự động vào
+  // lại bằng phiên cũ. Cách này chuyển hẳn trang sang Microsoft rồi tự quay lại.
+  if(msalInstance){
+    try{
+      await msalInstance.logoutRedirect({
+        account,
+        postLogoutRedirectUri: window.location.origin + window.location.pathname
+      });
+      return; // trang sẽ rời đi ngay đây
+    }catch(e){
+      console.error('OneDrive sign-out error:', e);
+    }
+  }
+  clearStuckMsalState();
   showToast('Đã đăng xuất OneDrive');
 }
 
