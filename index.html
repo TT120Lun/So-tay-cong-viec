@@ -5,6 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Sổ Tay Công Việc — OneDrive</title>
 <script>
+// ===== Đăng ký PWA: cho phép cài app + nhận Chia sẻ trực tiếp từ Zalo/app khác =====
+(function(){
+  try{
+    var base = window.location.href.replace(/[^\/]*$/, '');
+    var manifest = {
+      name: 'Sổ Tay Công Việc',
+      short_name: 'Sổ Tay CV',
+      start_url: base + 'index.html',
+      scope: base,
+      display: 'standalone',
+      background_color: '#0B1F33',
+      theme_color: '#0B1F33',
+      icons: [
+        { src: 'data:image/png;base64,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', sizes: '192x192', type: 'image/png' },
+        { src: 'data:image/png;base64,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', sizes: '512x512', type: 'image/png' }
+      ],
+      share_target: {
+        action: base + 'share-target.html',
+        method: 'POST',
+        enctype: 'multipart/form-data',
+        params: {
+          title: 'title',
+          text: 'text',
+          url: 'url',
+          files: [
+            { name: 'files', accept: ['image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv', '.ppt', '.pptx'] }
+          ]
+        }
+      }
+    };
+    var link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest));
+    document.head.appendChild(link);
+
+    var themeMeta = document.createElement('meta');
+    themeMeta.name = 'theme-color';
+    themeMeta.content = '#0B1F33';
+    document.head.appendChild(themeMeta);
+  }catch(e){ /* trình duyệt không hỗ trợ -> bỏ qua, app vẫn chạy bình thường */ }
+})();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(e){
+      console.error('Đăng ký service worker thất bại:', e);
+    });
+  });
+}
+</script>
+<script>
 /* Thư viện đăng nhập Microsoft (MSAL.js v2.38.3) — đóng gói sẵn ngay trong file này, không cần tải từ máy chủ ngoài */
 /*! @azure/msal-browser v2.38.3 2023-10-27 */
 "use strict";!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e="undefined"!=typeof globalThis?globalThis:e||self).msal={})}(this,(function(e){
@@ -288,6 +339,25 @@ var st,ct,ut,lt,dt,ht,pt,gt,ft,mt=function(){function t(e,t,r){this.networkInter
   .chip.cat-thietke{ color:#5B8DEF; border-color:#5B8DEF; }
   .chip.cat-kehoach{ color:#B47EE0; border-color:#B47EE0; }
   .chip.cat-canhan{ color:var(--paper-dim); border-color:var(--paper-dim); }
+
+  .search-row{
+    position:relative;
+    margin-top:8px;
+  }
+  .search-row input{
+    width:100%;
+    background:var(--ink-800); border:1px solid var(--grid-line); border-radius:5px;
+    color:var(--paper); font-family:var(--font-body); font-size:13.5px;
+    padding:8px 34px 8px 12px;
+  }
+  .search-row input::placeholder{ color:var(--paper-dim); }
+  .search-row input:focus{ outline:none; border-color:var(--amber); }
+  .search-row .clearBtn{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    width:24px; height:24px; border:none; background:transparent;
+    color:var(--paper-dim); font-size:16px; line-height:1;
+  }
+  .search-row .clearBtn:hover{ color:var(--amber); }
 
   .cat-tabs{
     display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; margin-top:8px;
@@ -628,6 +698,10 @@ var st,ct,ut,lt,dt,ht,pt,gt,ft,mt=function(){function t(e,t,r){this.networkInter
     <button class="cat-tab" data-cat="kehoach" data-i18n="catKehoach">Kế Hoạch</button>
     <button class="cat-tab" data-cat="canhan" data-i18n="catCanhan">Cá Nhân</button>
   </div>
+  <div class="search-row">
+    <input type="text" id="searchInput" data-i18n-ph="searchPh" placeholder="🔍 Tìm theo từ khoá (tên việc, ghi chú, tên file...)" />
+    <button class="clearBtn" id="searchClearBtn" style="display:none">×</button>
+  </div>
   <div class="backup-row">
     <button id="exportBtn" class="ghostlink" data-i18n="backupExport">⭳ Sao lưu file</button>
     <span class="sep">·</span>
@@ -793,6 +867,8 @@ const I18N = {
     emptyMark: '// GHI CHÚ RỖNG',
     emptyBody: 'Chưa có việc nào. Bất cứ khi nào nhớ ra việc gì, gõ ngay vào ô bên dưới — kể cả chỉ một dòng ngắn.',
     emptyBodyFiltered: 'Không có việc nào trong mục này.',
+    emptySearch: 'Không tìm thấy việc nào khớp với từ khoá.',
+    searchPh: '🔍 Tìm theo từ khoá (tên việc, ghi chú, tên file...)',
     composerPh: 'Nhập việc cần làm... (không giới hạn độ dài)',
     notePh: '+ ghi chú (tuỳ chọn)',
     priVua: 'Ưu tiên: Vừa', priCao: 'Ưu tiên: Cao', priThap: 'Ưu tiên: Thấp',
@@ -831,6 +907,8 @@ const I18N = {
     emptyMark: '// EMPTY LOG',
     emptyBody: 'No tasks yet. Whenever you think of something, type it below — even just one short line.',
     emptyBodyFiltered: 'No tasks in this view.',
+    emptySearch: 'No tasks match your search.',
+    searchPh: '🔍 Search by keyword (title, note, file name...)',
     composerPh: 'Type a task... (no length limit)',
     notePh: '+ note (optional)',
     priVua: 'Priority: Medium', priCao: 'Priority: High', priThap: 'Priority: Low',
@@ -918,6 +996,7 @@ let lightboxIndex = 0;
 let selectMode = false;
 let selectedIds = new Set();
 let currentCategory = 'all';
+let searchQuery = '';
 
 function showToast(msg){
   toastEl.textContent = msg;
@@ -985,6 +1064,61 @@ async function idbSet(key, value){
     tx.oncomplete = ()=> resolve(true);
     tx.onerror = ()=> reject(tx.error);
   });
+}
+async function idbDelete(key){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(key);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+// ===== Nhận nội dung được "Chia sẻ" từ app khác (Zalo, Gmail, Thư viện ảnh...) =====
+// Được sw.js lưu tạm vào IndexedDB khi có ai bấm Chia sẻ -> chọn app này; ở đây
+// đọc ra, điền sẵn vào ô nhập việc, rồi xoá đi để không dùng lại lần sau.
+async function checkPendingShare(){
+  let payload;
+  try{
+    payload = await idbGet('pendingShare');
+  }catch(e){ return; }
+  if(!payload) return;
+  try{ await idbDelete('pendingShare'); }catch(e){}
+
+  const combinedText = [payload.title, payload.text, payload.url].filter(Boolean).join('\n');
+  if(combinedText){
+    titleInput.value = combinedText;
+    autoResize(titleInput);
+    addBtn.disabled = !titleInput.value.trim();
+  }
+
+  for(const f of (payload.files || [])){
+    const isImage = f.type && f.type.startsWith('image/');
+    try{
+      if(isImage){
+        const dataUrl = await compressImage(f.blob);
+        pendingImages.push({ id: genId(), dataUrl });
+      } else if(odAccount){
+        const entry = { id: genId(), name: f.name, size: f.size, type: f.type, dataUrl: null, link: null, pendingUpload: true, progress: 0 };
+        if(f.size <= LOCAL_FILE_MAX){
+          try{ entry.dataUrl = await readFileAsDataUrl(f.blob); }catch(e){}
+        }
+        pendingFiles.push(entry);
+        renderPendingFiles();
+        uploadFileObjectAndAttachLink(f.blob, entry, renderPendingFiles);
+      } else {
+        const dataUrl = await readFileAsDataUrl(f.blob);
+        pendingFiles.push({ id: genId(), name: f.name, size: f.size, type: f.type, dataUrl, link: null, pendingUpload: false });
+      }
+    }catch(e){ /* bỏ qua đúng phần tử lỗi, không chặn phần còn lại */ }
+  }
+  renderPendingThumbs();
+  renderPendingFiles();
+  if(combinedText || (payload.files && payload.files.length)){
+    showToast(currentLang==='en' ? 'Received shared content — check and save' : 'Đã nhận nội dung chia sẻ — kiểm tra rồi bấm Lưu việc');
+  }
+  history.replaceState(null, '', window.location.pathname);
 }
 
 async function loadTasks(){
@@ -1728,10 +1862,25 @@ async function shareImage(blob, filename){
   }
 }
 
+function normalizeSearch(str){
+  return (str||'').toString().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
+}
+function taskSearchHay(t){
+  const parts = [t.title, t.note, categoryLabel(t.category), priorityLabel(t.priority)];
+  (t.files||[]).forEach(f=> parts.push(f.name));
+  return normalizeSearch(parts.filter(Boolean).join(' '));
+}
+
 function filteredTasks(){
   const now = new Date();
   let base = tasks;
   if(currentCategory !== 'all') base = base.filter(t=> t.category === currentCategory);
+  if(searchQuery.trim()){
+    const q = normalizeSearch(searchQuery.trim());
+    base = base.filter(t=> taskSearchHay(t).includes(q));
+  }
   if(currentFilter==='today') return base.filter(t=>!t.done && t.due && isSameDay(new Date(t.due), now));
   if(currentFilter==='overdue') return base.filter(t=>!t.done && t.due && new Date(t.due) < now && !isSameDay(new Date(t.due), now));
   if(currentFilter==='done') return base.filter(t=>t.done);
@@ -1834,7 +1983,10 @@ function render(){
   const items = filteredTasks();
   list.innerHTML = '';
   emptyState.style.display = items.length ? 'none' : 'block';
-  if(!items.length && currentFilter!=='all'){
+  if(!items.length && searchQuery.trim()){
+    emptyState.querySelector('p').textContent = T('emptySearch');
+    emptyState.style.display = 'block';
+  } else if(!items.length && currentFilter!=='all'){
     emptyState.querySelector('p').textContent = T('emptyBodyFiltered');
     emptyState.style.display = 'block';
   } else if(!items.length){
@@ -2540,6 +2692,19 @@ $('cloudSignOutBtn').addEventListener('click', signOutOneDrive);
 $('cloudPushBtn').addEventListener('click', ()=> pushToOneDrive(false));
 $('cloudPullBtn').addEventListener('click', ()=> pullFromOneDrive(false));
 
+$('searchInput').addEventListener('input', ()=>{
+  searchQuery = $('searchInput').value;
+  $('searchClearBtn').style.display = searchQuery ? '' : 'none';
+  render();
+});
+$('searchClearBtn').addEventListener('click', ()=>{
+  $('searchInput').value = '';
+  searchQuery = '';
+  $('searchClearBtn').style.display = 'none';
+  render();
+  $('searchInput').focus();
+});
+
 $('langViBtn').addEventListener('click', ()=> setLanguage('vi'));
 $('langEnBtn').addEventListener('click', ()=> setLanguage('en'));
 $('backupBannerBackupBtn').addEventListener('click', exportBackup);
@@ -2550,7 +2715,7 @@ $('backupBannerSnoozeBtn').addEventListener('click', ()=>{
 applyStaticI18n();
 
 fmtDateHeader();
-loadTasks().then(()=>{ checkBackupReminder(); return initOneDrive(); });
+loadTasks().then(()=>{ checkBackupReminder(); return initOneDrive(); }).then(()=> checkPendingShare());
 </script>
 </body>
 </html>
